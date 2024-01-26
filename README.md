@@ -41,6 +41,6 @@ import * as fs from "fs";
 const buffer = fs.readFileSync('./tests/resources/dds/bc1.dds')
 const imageInfo = parseDDSHeader(buffer)
 if (imageInfo) {
-    const rgbaBuffer = decodeImage(buffer, imageInfo.format, imageInfo.layer[0])
+    const rgbaBuffer = decodeImage(buffer, imageInfo.format, imageInfo.layers[0])
 }
 ```
