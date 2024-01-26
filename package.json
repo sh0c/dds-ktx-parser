@@ -1,0 +1,25 @@
+{
+  "name": "dds-ktx-parser",
+  "version": "1.0.0",
+  "description": "Parse image files with DDS and KTX format and decode some of formats to RGB/RGBA array.",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsup",
+    "test": "jest"
+ },
+  "keywords": [
+    "dds",
+    "ktx",
+    "parser",
+    "decoder"
+  ],
+  "author": "sh0c",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.11",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
