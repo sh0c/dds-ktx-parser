@@ -127,7 +127,7 @@ export function parseDDSHeader(b: Buffer) : ImageInfo | undefined {
                         imageFormat = 'BC7'
                         break
                     case DXGI_FORMAT.BC7_UNORM_SRGB:
-                        imageFormat = 'BC7F'
+                        imageFormat = 'BC7'
                         break
                 }
 

@@ -6,7 +6,7 @@
 // DXT5 = BC3
 // ATI1 = BC4
 // ATI2 = BC5
-export type ImageFormat = 'BC1' | 'BC2' | 'BC3' | 'BC4' | 'BC5' | 'BC6H' | 'BC7' | 'BC7F'
+export type ImageFormat = 'BC1' | 'BC2' | 'BC3' | 'BC4' | 'BC5' | 'BC6H' | 'BC7'
 
 export interface ImageShape {
     readonly width: number
@@ -44,5 +44,6 @@ export const formatSizes: Record<string, FormatSize> = {
     'BC5': {blockWidth: 4,  blockHeight: 4, blockSize: 16},
     'BC6H': {blockWidth: 4,  blockHeight: 4, blockSize: 16},
     'BC7': {blockWidth: 4,  blockHeight: 4, blockSize: 16},
-    'BC7F': {blockWidth: 4,  blockHeight: 4, blockSize: 16},
+    'RGB': {blockWidth: 1, blockHeight: 1, blockSize: 3},
+    'RGBA': {blockWidth: 1, blockHeight: 1, blockSize: 4},
 }
