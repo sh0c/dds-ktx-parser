@@ -29,7 +29,7 @@ Supproted decode formats:
  - [x] BC4
  - [x] BC5
  - [ ] BC6H (TODO)
- - [ ] BC7 (TODO)
+ - [X] BC7
  - [ ] Raw formats - R, RG, RGB (TODO)
 
  ### EXAMPLE
