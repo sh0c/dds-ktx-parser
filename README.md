@@ -6,7 +6,7 @@ Parse .DDS and .KTX files and return ImageInfo about format, mipmaps and shape o
  - [x] DDS file parse
  - [ ] KTX file parse (TODO)
 
-On ERROR function will return undefined
+On ERROR function will return **undefined**
 ```ts
 interface ImageInfo {
     readonly shape: ImageShape // width and height
@@ -21,7 +21,7 @@ Supported parse Image formats:
 
 ### DATA PARSING
 
-Image can be decode to RGBA Buffer layer by layer.
+Image can be decoded to **RGBA Buffer** layer by layer.
 Supproted decode formats:
  - [x] BC1
  - [x] BC2
