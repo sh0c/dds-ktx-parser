@@ -21,14 +21,14 @@ Supported parse Image formats:
 
 ### DATA PARSING
 
-Image can be decoded to **RGBA Buffer** layer by layer.
+Image can be decoded to **RGBA Buffer** layer by layer without external dependencies (only CPU usage)
 Supproted decode formats:
  - [x] BC1
  - [x] BC2
  - [x] BC3
  - [x] BC4
  - [x] BC5
- - [ ] BC6H (TODO)
+ - [X] BC6H
  - [X] BC7
  - [ ] Raw formats - R, RG, RGB (TODO)
 

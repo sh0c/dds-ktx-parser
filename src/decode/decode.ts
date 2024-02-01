@@ -5,6 +5,7 @@ import { decodeBC2Block } from './bc2'
 import { decodeBC3Block } from './bc3'
 import { decodeBC4Block } from './bc4'
 import { decodeBC5Block } from './bc5'
+import { decodeBC6HBlock } from './bc6h'
 import { decodeBC7Block } from './bc7'
 
 type blockDecodeFunctionType = (inputBuffer: Uint8Array, size: FormatSize) => Buffer
@@ -15,7 +16,8 @@ const blockDecode: Record<string, blockDecodeFunctionType> = {
     'BC3': decodeBC3Block,
     'BC4': decodeBC4Block,
     'BC5': decodeBC5Block,
-    'BC7': decodeBC7Block
+    'BC6H': decodeBC6HBlock,
+    'BC7': decodeBC7Block,
 }
 
 const rgbaPixelSize: number = formatSizes['RGBA'].blockSize
