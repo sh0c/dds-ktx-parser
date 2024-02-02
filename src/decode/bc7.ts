@@ -22,7 +22,6 @@ const bc7TableAWeight4 = new Uint8Array([
 const rgbaPixelSize: number = formatSizes['RGBA'].blockSize
 
 function extractMode(byte: number): number {
-    var mode: number = 0
     for (var i = 0; i < 8; i++) {
         if ((byte & (1 << i)) !== 0) {
             return i

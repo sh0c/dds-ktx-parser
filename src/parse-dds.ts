@@ -64,10 +64,10 @@ export function parseDDSHeader(b: Buffer) : ImageInfo | undefined {
         faceCount = incrementOnFlag(cubemapFlags, CUBEMAP_FLAGS.CUBEMAP_POSITIVEX, faceCount)
     }
 
-    var depthCount: number = 1
-    if ((cubemapFlags & CUBEMAP_FLAGS.VOLUME) !== 0) {
-        depthCount = header[depthPos]
-    }
+    // var depthCount: number = 1
+    // if ((cubemapFlags & CUBEMAP_FLAGS.VOLUME) !== 0) {
+    //     depthCount = header[depthPos]
+    // }
 
     var imageFormat: ImageFormat = 'BC1'
     if ((flags & DDPF.DDPF_FOURCC) !== 0) {

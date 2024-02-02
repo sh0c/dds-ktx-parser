@@ -1,4 +1,4 @@
-import { ImageFormat, ImageInfo, LayerInfo, formatSizes } from './header-info'
+import { ImageFormat, ImageInfo, LayerInfo } from './header-info'
 
 enum InternalFormat
 {
@@ -225,12 +225,12 @@ enum InternalFormat
 const magic: Uint8Array = new Uint8Array([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A])
 const headerLenght: number = 13 * Uint32Array.BYTES_PER_ELEMENT
 
-const endiannesPos: number = 0
-const glTypePos: number = 1
-const glTypeSizePos: number = 2
-const glFormatPos: number = 3
+//const endiannesPos: number = 0
+//const glTypePos: number = 1
+//const glTypeSizePos: number = 2
+//const glFormatPos: number = 3
 const glInternalFormatPos: number = 4
-const glBaseInternalFormatPos: number = 5
+//const glBaseInternalFormatPos: number = 5
 const widthPos: number = 6
 const heightPos: number = 7
 const depthPos: number = 8
@@ -296,8 +296,8 @@ export function parseKTXHeader(b: Buffer): ImageInfo | undefined {
     const width: number = header[widthPos]
     const height: number = header[heightPos]
     const depth: number = header[depthPos]
-    const layers: number = header[layerCountPos]
-    const faces: number = header[faceCountPos]
+    //const layers: number = header[layerCountPos]
+    //const faces: number = header[faceCountPos]
     const levels: number = header[levelCountPos]
     const metaBytes: number = header[byteOfKeyValuesDataPos]
     const rawBuffer: Uint8Array = new Uint8Array(b.buffer, b.byteOffset + magic.length + headerLenght + metaBytes)
