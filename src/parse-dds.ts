@@ -41,7 +41,7 @@ export function parseDDSHeader(b: Buffer) : ImageInfo | undefined {
     if (header[magicPos] !== magic) {
         return undefined
     }
-    let dataOffset: number = headerSize + Uint32Array.BYTES_PER_ELEMENT /*magic size*/;
+    var dataOffset: number = headerSize + Uint32Array.BYTES_PER_ELEMENT /*magic size*/
     // check for proper header size
     const size = header[sizePos]
     if (headerSize !== size) {
@@ -54,7 +54,7 @@ export function parseDDSHeader(b: Buffer) : ImageInfo | undefined {
     const flags = header[formatFlagsPos]
     const cubemapFlags = header[cubemapFlagsPos]
 
-    let faceCount: number = 1
+    var faceCount: number = 1
     if ((cubemapFlags & CUBEMAP_FLAGS.CUBEMAP) !== 0) {
         faceCount = incrementOnFlag(cubemapFlags, CUBEMAP_FLAGS.CUBEMAP_NEGATIVEZ, faceCount)
         faceCount = incrementOnFlag(cubemapFlags, CUBEMAP_FLAGS.CUBEMAP_POSITIVEZ, faceCount)
@@ -64,12 +64,12 @@ export function parseDDSHeader(b: Buffer) : ImageInfo | undefined {
         faceCount = incrementOnFlag(cubemapFlags, CUBEMAP_FLAGS.CUBEMAP_POSITIVEX, faceCount)
     }
 
-    let depthCount: number = 1
+    var depthCount: number = 1
     if ((cubemapFlags & CUBEMAP_FLAGS.VOLUME) !== 0) {
         depthCount = header[depthPos]
     }
 
-    let imageFormat: ImageFormat = 'BC1'
+    var imageFormat: ImageFormat = 'BC1'
     if ((flags & DDPF.DDPF_FOURCC) !== 0) {
         const fourCC = header[formatFourCC]
         switch (fourCC) {
@@ -141,14 +141,14 @@ export function parseDDSHeader(b: Buffer) : ImageInfo | undefined {
         // TODO handle raw types (RGB, RGBA)
     }
     
-    let layerInfo = new Array<LayerInfo>()
+    var layerInfo = new Array<LayerInfo>()
     if (imageFormat) {
         const formatSize = formatSizes[imageFormat]
 
-        let workWidth = width
-        let workHeight = height
+        var workWidth = width
+        var workHeight = height
 
-        for (let i = 0; i < levels; i++) {
+        for (var i = 0; i < levels; i++) {
 
             const widthBlocks = Math.floor((workWidth + formatSize.blockWidth - 1) / formatSize.blockWidth)
             const heightBlocks = Math.floor((workHeight + formatSize.blockHeight - 1) / formatSize.blockHeight)

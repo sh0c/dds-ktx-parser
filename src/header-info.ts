@@ -25,7 +25,7 @@ export interface LayerInfo {
 
 export interface ImageInfo {
     readonly shape: ImageShape
-    readonly layers: Array<LayerInfo>;
+    readonly layers: Array<LayerInfo>
     readonly format: ImageFormat
 }
 
