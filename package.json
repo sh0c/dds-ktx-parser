@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsup",
     "test": "jest"
- },
+  },
   "keywords": [
     "dds",
     "ktx",
@@ -15,11 +15,17 @@
   ],
   "author": "sh0c",
   "license": "MIT",
+  "homepage": "https://github.com/sh0c/dds-ktx-parser",
+  "bugs": {
+    "url": "https://github.com/sh0c/dds-ktx-parser"
+  },
+  "repository": "github:sh0c/dds-ktx-parser",
   "devDependencies": {
     "@types/jest": "^29.5.11",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
+    "tsup": "^8.0.1",
     "typescript": "^5.3.3"
   }
 }
