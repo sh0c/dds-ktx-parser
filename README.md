@@ -1,5 +1,7 @@
 # dds-ktx-parser
 
+[![stable](http://badges.github.io/stability-badges/dist/stable.svg)](http://github.com/badges/stability-badges)
+
 ### HEADER PARSING
 
 Parse .DDS and .KTX files and return ImageInfo about format, mipmaps and shape of image
