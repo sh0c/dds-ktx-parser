@@ -59,6 +59,26 @@ function fromVk(vk: number): Format | undefined {
             return ['BC7', false]
         case 146:
             return ['BC7', true]
+        case 147: // ETC2_R8G8B8_UNORM_BLOCK
+            return ['ETC2_RGB', false]
+        case 148:
+            return ['ETC2_RGB', true]
+        case 149: // ETC2_R8G8B8A1_UNORM_BLOCK
+            return ['ETC2_RGB_A1', false]
+        case 150:
+            return ['ETC2_RGB_A1', true]
+        case 151: // ETC2_R8G8B8A8_UNORM_BLOCK
+            return ['ETC2_RGBA', false]
+        case 152:
+            return ['ETC2_RGBA', true]
+        case 153: // EAC_R11_UNORM_BLOCK
+            return ['EAC_R11', false]
+        case 154:
+            return ['EAC_R11_SNORM', false]
+        case 155: // EAC_R11G11_UNORM_BLOCK
+            return ['EAC_RG11', false]
+        case 156:
+            return ['EAC_RG11_SNORM', false]
         case 4: // R5G6B5_UNORM_PACK16: red in the top bits, as B5G6R5 has it
             return ['B5G6R5', false]
         case 8: // A1R5G5B5_UNORM_PACK16: as B5G5R5A1

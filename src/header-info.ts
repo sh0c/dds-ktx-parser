@@ -18,6 +18,16 @@ export type CompressedFormat =
     | 'BC6H' // unsigned half floats (UF16)
     | 'BC6H_SF16'
     | 'BC7'
+    // ETC and EAC, the formats of OpenGL ES and Vulkan on phones. ETC1 is
+    // a subset of ETC2 RGB, and decoded as it.
+    | 'ETC1'
+    | 'ETC2_RGB'
+    | 'ETC2_RGB_A1' // one bit of alpha: "punchthrough"
+    | 'ETC2_RGBA' // EAC alpha with ETC2 colour
+    | 'EAC_R11'
+    | 'EAC_R11_SNORM'
+    | 'EAC_RG11'
+    | 'EAC_RG11_SNORM'
 
 // Channels named in the order their bytes are in the file.
 export type UncompressedFormat =
@@ -128,6 +138,14 @@ export const formatSizes: Record<string, FormatSize> = {
     BC6H: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
     BC6H_SF16: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
     BC7: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
+    ETC1: { blockWidth: 4, blockHeight: 4, blockSize: 8 },
+    ETC2_RGB: { blockWidth: 4, blockHeight: 4, blockSize: 8 },
+    ETC2_RGB_A1: { blockWidth: 4, blockHeight: 4, blockSize: 8 },
+    ETC2_RGBA: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
+    EAC_R11: { blockWidth: 4, blockHeight: 4, blockSize: 8 },
+    EAC_R11_SNORM: { blockWidth: 4, blockHeight: 4, blockSize: 8 },
+    EAC_RG11: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
+    EAC_RG11_SNORM: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
     RGBA8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     RGBX8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     BGRA8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
@@ -178,6 +196,14 @@ const channelsOfFormat: Record<ImageFormat, Channels> = {
     BC6H: 'RGB',
     BC6H_SF16: 'RGB',
     BC7: 'RGBA',
+    ETC1: 'RGB',
+    ETC2_RGB: 'RGB',
+    ETC2_RGB_A1: 'RGBA',
+    ETC2_RGBA: 'RGBA',
+    EAC_R11: 'R',
+    EAC_R11_SNORM: 'R',
+    EAC_RG11: 'RG',
+    EAC_RG11_SNORM: 'RG',
     RGBA8: 'RGBA',
     RGBX8: 'RGB',
     BGRA8: 'RGBA',

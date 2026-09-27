@@ -265,6 +265,28 @@ function fromGL(internalFormat: number, type: number): Format | undefined {
             return ['BC7', false]
         case InternalFormat.SRGB_BP_UNORM:
             return ['BC7', true]
+        case InternalFormat.RGB_ETC:
+            return ['ETC1', false]
+        case InternalFormat.RGB_ETC2:
+            return ['ETC2_RGB', false]
+        case InternalFormat.SRGB8_ETC2:
+            return ['ETC2_RGB', true]
+        case InternalFormat.RGBA_PUNCHTHROUGH_ETC2:
+            return ['ETC2_RGB_A1', false]
+        case InternalFormat.SRGB8_PUNCHTHROUGH_ALPHA1_ETC2:
+            return ['ETC2_RGB_A1', true]
+        case InternalFormat.RGBA_ETC2:
+            return ['ETC2_RGBA', false]
+        case InternalFormat.SRGB8_ALPHA8_ETC2_EAC:
+            return ['ETC2_RGBA', true]
+        case InternalFormat.R11_EAC:
+            return ['EAC_R11', false]
+        case InternalFormat.SIGNED_R11_EAC:
+            return ['EAC_R11_SNORM', false]
+        case InternalFormat.RG11_EAC:
+            return ['EAC_RG11', false]
+        case InternalFormat.SIGNED_RG11_EAC:
+            return ['EAC_RG11_SNORM', false]
         case InternalFormat.RGBA8_UNORM:
             return ['RGBA8', false]
         case InternalFormat.SRGB8_ALPHA8:

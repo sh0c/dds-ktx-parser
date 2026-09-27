@@ -17,6 +17,13 @@ import { decodeBC4Block, decodeBC4SnormBlock } from './bc4'
 import { decodeBC5Block, decodeBC5SnormBlock } from './bc5'
 import { decodeBC6HBlock } from './bc6h'
 import { decodeBC7Block } from './bc7'
+import {
+    decodeEACR11Block,
+    decodeEACRG11Block,
+    decodeETC2A1Block,
+    decodeETC2Block,
+    decodeETC2RGBABlock,
+} from './etc'
 import { decodeRowFloat } from './uncompressed'
 
 type BytesBlock = (block: Uint8Array, size: FormatSize) => Uint8Array
@@ -31,12 +38,20 @@ const bytesBlocks: Partial<Record<ImageFormat, BytesBlock>> = {
     BC4: decodeBC4Block,
     BC5: decodeBC5Block,
     BC7: decodeBC7Block,
+    ETC1: decodeETC2Block,
+    ETC2_RGB: decodeETC2Block,
+    ETC2_RGB_A1: decodeETC2A1Block,
+    ETC2_RGBA: decodeETC2RGBABlock,
 }
 const floatBlocks: Partial<Record<ImageFormat, FloatBlock>> = {
     BC4_SNORM: decodeBC4SnormBlock,
     BC5_SNORM: decodeBC5SnormBlock,
     BC6H: (block, size) => decodeBC6HBlock(block, size, false),
     BC6H_SF16: (block, size) => decodeBC6HBlock(block, size, true),
+    EAC_R11: (block) => decodeEACR11Block(block, false),
+    EAC_R11_SNORM: (block) => decodeEACR11Block(block, true),
+    EAC_RG11: (block) => decodeEACRG11Block(block, false),
+    EAC_RG11_SNORM: (block) => decodeEACRG11Block(block, true),
 }
 
 // Signed formats are shown in 8 bits with -1 as 0 and 1 as 255, the way a
