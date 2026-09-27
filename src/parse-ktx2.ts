@@ -1,4 +1,4 @@
-import { ImageFormat, ImageInfo, LayerInfo, ParseOptions, channelsOf, levelLength, plausible } from './header-info'
+import { ASTC_SIZES, ImageFormat, ImageInfo, LayerInfo, ParseOptions, channelsOf, levelLength, plausible } from './header-info'
 import { u32 } from './bytes'
 import type { Supercompression } from './decompress'
 
@@ -28,6 +28,13 @@ type Format = [ImageFormat, boolean] // the format, and whether it is sRGB
 
 // VkFormat numbers, from the Vulkan specification.
 function fromVk(vk: number): Format | undefined {
+    // ASTC: VK_FORMAT_ASTC_4x4_UNORM_BLOCK (157) onwards, UNORM and SRGB in
+    // turn; and the HDR ones, VK_FORMAT_ASTC_4x4_SFLOAT_BLOCK onwards.
+    if (vk >= 157 && vk <= 184) {
+        const size = ASTC_SIZES[(vk - 157) >> 1]
+        return (vk - 157) & 1 ? [`ASTC_${size}_SRGB`, true] : [`ASTC_${size}`, false]
+    }
+    if (vk >= 1000066000 && vk <= 1000066013) return [`ASTC_${ASTC_SIZES[vk - 1000066000]}_HDR`, false]
     switch (vk) {
         case 131: // BC1_RGB_UNORM_BLOCK
         case 133: // BC1_RGBA_UNORM_BLOCK

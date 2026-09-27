@@ -2,6 +2,7 @@ import { ImageInfo, LayerInfo, ParseOptions } from './header-info'
 import { DDS_HEADER_BYTES, parseDDSHeader } from './parse-dds'
 import { detectContainer, walkKTX } from './parse-ktx'
 import { ktx2IndexBytes, parseKTX2Header } from './parse-ktx2'
+import { parseASTCHeader } from './parse-astc'
 import { decompress } from './decompress'
 import { u32 } from './bytes'
 
@@ -33,6 +34,8 @@ export async function readImageInfo(
     switch (detectContainer(head)) {
         case 'dds':
             return parseDDSHeader(head, fileSize, options)
+        case 'astc':
+            return parseASTCHeader(head, fileSize, options)
         case 'ktx': {
             const walk = walkKTX(head, fileSize, options)
             let step = walk.next()

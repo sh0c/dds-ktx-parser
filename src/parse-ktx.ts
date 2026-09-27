@@ -1,4 +1,4 @@
-import { ImageFormat, ImageInfo, LayerInfo, ParseOptions, channelsOf, levelLength, plausible } from './header-info'
+import { ASTC_SIZES, ImageFormat, ImageInfo, LayerInfo, ParseOptions, channelsOf, levelLength, plausible } from './header-info'
 import { align, u32 } from './bytes'
 
 enum InternalFormat
@@ -234,6 +234,12 @@ const GL_LUMINANCE: number = 0x1909
 type Format = [ImageFormat, boolean] // the format, and whether it is sRGB
 
 function fromGL(internalFormat: number, type: number): Format | undefined {
+    // ASTC: GL_COMPRESSED_RGBA_ASTC_4x4_KHR (0x93B0) onwards, and the sRGB
+    // ones from 0x93D0, in the order of ASTC_SIZES. GL has no HDR format of
+    // its own — HDR is a profile — so these are read as LDR.
+    if (internalFormat >= 0x93b0 && internalFormat <= 0x93bd) return [`ASTC_${ASTC_SIZES[internalFormat - 0x93b0]}`, false]
+    if (internalFormat >= 0x93d0 && internalFormat <= 0x93dd)
+        return [`ASTC_${ASTC_SIZES[internalFormat - 0x93d0]}_SRGB`, true]
     switch (internalFormat) {
         case InternalFormat.RGB_DXT1:
         case InternalFormat.RGBA_DXT1:
@@ -389,11 +395,12 @@ function same(bytes: Uint8Array, expected: Uint8Array): boolean {
 // What kind of file @head starts: a DDS, a KTX 1, or a KTX 2 — which this
 // cannot read yet, and which is worth telling apart from a file that is not
 // a texture at all.
-export function detectContainer(head: Uint8Array): 'dds' | 'ktx' | 'ktx2' | undefined {
+export function detectContainer(head: Uint8Array): 'dds' | 'ktx' | 'ktx2' | 'astc' | undefined {
     if (head.length >= 4 && head[0] === 0x44 && head[1] === 0x44 && head[2] === 0x53 && head[3] === 0x20)
         return 'dds'
     if (same(head, magic)) return 'ktx'
     if (same(head, magic2)) return 'ktx2'
+    if (head.length >= 4 && head[0] === 0x13 && head[1] === 0xab && head[2] === 0xa1 && head[3] === 0x5c) return 'astc'
     return undefined
 }
 

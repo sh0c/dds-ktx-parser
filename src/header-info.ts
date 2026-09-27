@@ -28,6 +28,27 @@ export type CompressedFormat =
     | 'EAC_R11_SNORM'
     | 'EAC_RG11'
     | 'EAC_RG11_SNORM'
+    | AstcFormat
+
+// ASTC, in each of its fourteen 2D block sizes, three ways: LDR, sRGB and
+// HDR decode the same bits differently, so each is a format of its own.
+export const ASTC_SIZES = [
+    '4x4', '5x4', '5x5', '6x5', '6x6', '8x5', '8x6', '8x8',
+    '10x5', '10x6', '10x8', '10x10', '12x10', '12x12',
+] as const
+export type AstcSize = (typeof ASTC_SIZES)[number]
+export type AstcFormat = `ASTC_${AstcSize}` | `ASTC_${AstcSize}_SRGB` | `ASTC_${AstcSize}_HDR`
+
+// The block size and profile of an ASTC format, or undefined for any other.
+export function astcOf(format: ImageFormat): { width: number; height: number; profile: 'ldr' | 'srgb' | 'hdr' } | undefined {
+    const m = /^ASTC_(\d+)x(\d+)(_SRGB|_HDR)?$/.exec(format)
+    if (!m) return undefined
+    return {
+        width: Number(m[1]),
+        height: Number(m[2]),
+        profile: m[3] === '_SRGB' ? 'srgb' : m[3] === '_HDR' ? 'hdr' : 'ldr',
+    }
+}
 
 // Channels named in the order their bytes are in the file.
 export type UncompressedFormat =
@@ -100,7 +121,7 @@ export interface LayerInfo {
 }
 
 export interface ImageInfo {
-    readonly container: 'dds' | 'ktx' | 'ktx2'
+    readonly container: 'dds' | 'ktx' | 'ktx2' | 'astc'
     readonly shape: ImageShape
     // every image in the file, in the order the file holds them
     readonly layers: Array<LayerInfo>
@@ -180,12 +201,17 @@ export const formatSizes: Record<string, FormatSize> = {
     RGB: { blockWidth: 1, blockHeight: 1, blockSize: 3 },
     RGBA: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
 }
+for (const size of ASTC_SIZES) {
+    const [w, h] = size.split('x').map(Number)
+    for (const suffix of ['', '_SRGB', '_HDR'])
+        formatSizes[`ASTC_${size}${suffix}`] = { blockWidth: w, blockHeight: h, blockSize: 16 }
+}
 
 // The channels a format carries. L is luminance (one value shown in all
 // three), A is alpha alone.
 export type Channels = 'R' | 'RG' | 'RGB' | 'RGBA' | 'L' | 'A'
 
-const channelsOfFormat: Record<ImageFormat, Channels> = {
+const channelsOfFormat: Record<Exclude<ImageFormat, AstcFormat>, Channels> = {
     BC1: 'RGBA', // its one-bit alpha mode
     BC2: 'RGBA',
     BC3: 'RGBA',
@@ -238,7 +264,7 @@ const channelsOfFormat: Record<ImageFormat, Channels> = {
 }
 
 export function channelsOf(format: ImageFormat): Channels {
-    return channelsOfFormat[format]
+    return astcOf(format) ? 'RGBA' : channelsOfFormat[format as Exclude<ImageFormat, AstcFormat>]
 }
 
 // Formats whose values run from -1 to 1. In 8 bits they are shown with -1

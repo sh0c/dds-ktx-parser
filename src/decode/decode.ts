@@ -3,11 +3,13 @@ import {
     ImageFormat,
     LayerInfo,
     UncompressedFormat,
+    astcOf,
     formatSizes,
     isCompressed,
     isSigned,
     levelLength,
 } from '../header-info'
+import { decodeASTCBytes, decodeASTCFloat } from './astc'
 import { unorm8 } from '../bytes'
 
 import { decodeBC1Block } from './bc1'
@@ -31,6 +33,15 @@ type FloatBlock = (block: Uint8Array, size: FormatSize) => Float32Array
 
 // The block formats that decode to bytes, and those that decode to floats:
 // HDR, and the signed ones, whose values run below zero.
+// ASTC's decoders, looked up by format: LDR and sRGB to bytes, HDR to floats.
+function astcBlocks(format: ImageFormat): { bytes?: BytesBlock; floats?: FloatBlock } {
+    const astc = astcOf(format)
+    if (!astc) return {}
+    const { width, height, profile } = astc
+    if (profile === 'hdr') return { floats: (block) => decodeASTCFloat(block, width, height, profile) }
+    return { bytes: (block) => decodeASTCBytes(block, width, height, profile) }
+}
+
 const bytesBlocks: Partial<Record<ImageFormat, BytesBlock>> = {
     BC1: decodeBC1Block,
     BC2: decodeBC2Block,
@@ -122,7 +133,7 @@ export function decodeImage(bytes: Uint8Array, imageFormat: ImageFormat, layer: 
     const { width, height } = layer.shape
     const result = new Uint8Array(width * height * 4)
 
-    const asBytes = bytesBlocks[imageFormat]
+    const asBytes = bytesBlocks[imageFormat] ?? astcBlocks(imageFormat).bytes
     if (asBytes) {
         eachBlock(bytes, from, imageFormat, layer, asBytes, (block, x, y, columns, rows) => {
             const blockWidth = formatSizes[imageFormat].blockWidth
@@ -135,7 +146,7 @@ export function decodeImage(bytes: Uint8Array, imageFormat: ImageFormat, layer: 
     }
 
     const toByte = isSigned(imageFormat) ? (v: number) => unorm8((v + 1) / 2) : unorm8
-    const asFloats = floatBlocks[imageFormat]
+    const asFloats = floatBlocks[imageFormat] ?? astcBlocks(imageFormat).floats
     if (asFloats) {
         eachBlock(bytes, from, imageFormat, layer, asFloats, (block, x, y, columns, rows) => {
             const blockWidth = formatSizes[imageFormat].blockWidth
@@ -165,8 +176,8 @@ export function decodeImageFloat(bytes: Uint8Array, imageFormat: ImageFormat, la
     const from = start(bytes, imageFormat, layer, slice)
     const { width } = layer.shape
 
-    const asFloats = floatBlocks[imageFormat]
-    const asBytes = bytesBlocks[imageFormat]
+    const asFloats = floatBlocks[imageFormat] ?? astcBlocks(imageFormat).floats
+    const asBytes = bytesBlocks[imageFormat] ?? astcBlocks(imageFormat).bytes
     if (asFloats || asBytes) {
         const result = new Float32Array(width * layer.shape.height * 4)
         const blockWidth = formatSizes[imageFormat].blockWidth
