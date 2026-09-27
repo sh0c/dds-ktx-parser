@@ -1,4 +1,22 @@
-export { ImageFormat, ImageInfo, LayerInfo, formatSizes } from './header-info'
-export { parseDDSHeader } from './parse-dds'
-export { parseKTXHeader } from './parse-ktx'
-export { decodeImage } from './decode'
+export {
+    CompressedFormat,
+    UncompressedFormat,
+    ImageFormat,
+    Channels,
+    ImageShape,
+    ImageInfo,
+    LayerInfo,
+    FormatSize,
+    ParseOptions,
+    formatSizes,
+    isCompressed,
+    isSigned,
+    channelsOf,
+    levelLength,
+    findLayer,
+    MAX_DIMENSION,
+} from './header-info'
+export { parseDDSHeader, DDS_HEADER_BYTES } from './parse-dds'
+export { parseKTXHeader, detectContainer, KTX_HEADER_BYTES } from './parse-ktx'
+export { readImageInfo, ReadRange } from './read'
+export { decodeImage, decodeImageFloat } from './decode/decode'

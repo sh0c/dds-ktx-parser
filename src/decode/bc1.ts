@@ -1,13 +1,16 @@
 import { FormatSize, formatSizes } from '../header-info'
 import { divisionBy3Table } from './devision-tables'
+import { u32 } from '../bytes'
+
+// One block's pixels, reused: decodeImage copies them out before the next block.
+const out = new Uint8Array(64)
 
 const rgbaPixelSize: number = formatSizes['RGBA'].blockSize
 
-export function decodeBC1Block(inputBuffer: Uint8Array, size: FormatSize): Buffer {
+export function decodeBC1Block(inputBuffer: Uint8Array, size: FormatSize): Uint8Array {
 
-    const uint32View = new Uint32Array(inputBuffer.buffer, inputBuffer.byteOffset, inputBuffer.length / Uint32Array.BYTES_PER_ELEMENT)
-    const colors: number = uint32View[0]
-    const pixels: number = uint32View[1]
+    const colors: number = u32(inputBuffer, 0)
+    const pixels: number = u32(inputBuffer, 4)
     const opaque: boolean = (colors & 0xFFFF) > ((colors & 0xFFFF0000) >> 16)
 
     var color_r = new Uint8Array(4)
@@ -38,7 +41,7 @@ export function decodeBC1Block(inputBuffer: Uint8Array, size: FormatSize): Buffe
     }
 
     const blockSizeInPixels: number = size.blockWidth * size.blockHeight
-    var outputBuffer = Buffer.alloc(blockSizeInPixels * rgbaPixelSize)
+    var outputBuffer = out.fill(0)
     for (var i = 0; i < blockSizeInPixels; i++) {
         const pixel: number = (pixels >> (i * 2)) & 0x03
         outputBuffer[i * rgbaPixelSize]  = color_r[pixel]

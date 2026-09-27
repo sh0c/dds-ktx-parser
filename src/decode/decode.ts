@@ -1,57 +1,170 @@
-import { FormatSize, LayerInfo, formatSizes } from '../header-info'
+import {
+    FormatSize,
+    ImageFormat,
+    LayerInfo,
+    UncompressedFormat,
+    formatSizes,
+    isCompressed,
+    isSigned,
+    levelLength,
+} from '../header-info'
+import { unorm8 } from '../bytes'
 
 import { decodeBC1Block } from './bc1'
 import { decodeBC2Block } from './bc2'
 import { decodeBC3Block } from './bc3'
-import { decodeBC4Block } from './bc4'
-import { decodeBC5Block } from './bc5'
+import { decodeBC4Block, decodeBC4SnormBlock } from './bc4'
+import { decodeBC5Block, decodeBC5SnormBlock } from './bc5'
 import { decodeBC6HBlock } from './bc6h'
 import { decodeBC7Block } from './bc7'
+import { decodeRowFloat } from './uncompressed'
 
-type blockDecodeFunctionType = (inputBuffer: Uint8Array, size: FormatSize) => Buffer
+type BytesBlock = (block: Uint8Array, size: FormatSize) => Uint8Array
+type FloatBlock = (block: Uint8Array, size: FormatSize) => Float32Array
 
-const blockDecode: Record<string, blockDecodeFunctionType> = {
-    'BC1': decodeBC1Block,
-    'BC2': decodeBC2Block,
-    'BC3': decodeBC3Block,
-    'BC4': decodeBC4Block,
-    'BC5': decodeBC5Block,
-    'BC6H': decodeBC6HBlock,
-    'BC7': decodeBC7Block,
+// The block formats that decode to bytes, and those that decode to floats:
+// HDR, and the signed ones, whose values run below zero.
+const bytesBlocks: Partial<Record<ImageFormat, BytesBlock>> = {
+    BC1: decodeBC1Block,
+    BC2: decodeBC2Block,
+    BC3: decodeBC3Block,
+    BC4: decodeBC4Block,
+    BC5: decodeBC5Block,
+    BC7: decodeBC7Block,
+}
+const floatBlocks: Partial<Record<ImageFormat, FloatBlock>> = {
+    BC4_SNORM: decodeBC4SnormBlock,
+    BC5_SNORM: decodeBC5SnormBlock,
+    BC6H: (block, size) => decodeBC6HBlock(block, size, false),
+    BC6H_SF16: (block, size) => decodeBC6HBlock(block, size, true),
 }
 
-const rgbaPixelSize: number = formatSizes['RGBA'].blockSize
+// Signed formats are shown in 8 bits with -1 as 0 and 1 as 255, the way a
+// normal map is usually looked at; everything else is clamped to [0, 1].
 
-export function decodeImage(inputBuffer: Buffer, imageFormat: string, layer: LayerInfo): Buffer {
-    const shape = layer.shape
-    const format = formatSizes[imageFormat]
-    const decodeFunc = blockDecode[imageFormat]
-    const blockIDWidth = Math.floor((shape.width + format.blockWidth - 1) / format.blockWidth)
-    const blockIDHeight = Math.floor((shape.height + format.blockHeight - 1) / format.blockHeight)
+// Where @slice of @layer starts in @bytes, having checked that @bytes holds
+// all of it — a shorter buffer is a mistake to say, not to read past.
+function start(bytes: Uint8Array, format: ImageFormat, layer: LayerInfo, slice: number): number {
+    if (!formatSizes[format]) throw new Error(`${format} is not a format this can decode`)
+    const { width, height } = layer.shape
+    const sliceLength = levelLength(format, width, height, 1).length
+    const rows = Math.ceil(height / formatSizes[format].blockHeight)
+    const length = Math.max(sliceLength, layer.rowPitch * rows)
+    if (!Number.isInteger(slice) || slice < 0 || slice >= layer.depth)
+        throw new RangeError(`this level has ${layer.depth} slice(s); there is no slice ${slice}`)
+    const from = layer.offset + slice * layer.rowPitch * rows
+    if (from + length > bytes.length)
+        throw new RangeError(
+            `decoding needs bytes ${from} to ${from + length} of the file, and ${bytes.length} were given`,
+        )
+    return from
+}
 
-    var resultImage = Buffer.alloc(shape.width * shape.height * rgbaPixelSize)
-    var offsetIn = layer.offset
-    for (var y = 0; y < blockIDHeight; y++) {
-        const startPixelY = y * format.blockHeight
-        const blockYCount = startPixelY + format.blockHeight > shape.height ? shape.height - startPixelY : format.blockHeight
-
-        for (var x = 0; x < blockIDWidth; x++) {
-            const uint8Buffer = new Uint8Array(inputBuffer.buffer, inputBuffer.byteOffset + offsetIn, format.blockSize)
-            const workBuffer = decodeFunc(uint8Buffer, format)
-
-            const startPixelX = x * format.blockWidth
-            const blockXCount = startPixelX + format.blockWidth > shape.width ? shape.width - startPixelX : format.blockWidth
-            const copySize = blockXCount * rgbaPixelSize
-
-            for (var i = 0; i < blockYCount; i++) {
-                const sourceStart = i * format.blockWidth * rgbaPixelSize
-                const targetStart = ((startPixelY + i) * shape.width + startPixelX) * rgbaPixelSize
-                workBuffer.copy(resultImage, targetStart, sourceStart, sourceStart + copySize)
-            }
-
-            offsetIn += format.blockSize
+// Walk the blocks of one image, handing each decoded block to @put with
+// where its top-left pixel goes and how much of it is inside the image.
+function eachBlock<T>(
+    bytes: Uint8Array,
+    from: number,
+    format: ImageFormat,
+    layer: LayerInfo,
+    decode: (block: Uint8Array, size: FormatSize) => T,
+    put: (block: T, x: number, y: number, columns: number, rows: number) => void,
+): void {
+    const size = formatSizes[format]
+    const { width, height } = layer.shape
+    const wide = Math.ceil(width / size.blockWidth)
+    const high = Math.ceil(height / size.blockHeight)
+    for (let by = 0; by < high; by++) {
+        const y = by * size.blockHeight
+        const rows = Math.min(size.blockHeight, height - y)
+        let at = from + by * layer.rowPitch
+        for (let bx = 0; bx < wide; bx++) {
+            const x = bx * size.blockWidth
+            put(decode(bytes.subarray(at, at + size.blockSize), size), x, y, Math.min(size.blockWidth, width - x), rows)
+            at += size.blockSize
         }
     }
+}
 
-    return resultImage
+function uncompressedFloat(bytes: Uint8Array, from: number, format: ImageFormat, layer: LayerInfo): Float32Array {
+    const { width, height } = layer.shape
+    const result = new Float32Array(width * height * 4)
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+    for (let y = 0; y < height; y++)
+        decodeRowFloat(bytes, view, from + y * layer.rowPitch, format as UncompressedFormat, width, result, y * width * 4)
+    return result
+}
+
+// Decode one image of the file to RGBA, a byte a channel, rows top to bottom.
+// @bytes is the whole file, or any part of it that holds this image, with
+// @layer's offset counted from its start. @slice picks the depth slice of a
+// volume texture.
+//
+// HDR values past 1.0 are clamped to 255 — decodeImageFloat has them as
+// they are. Signed formats show -1 as 0 and 1 as 255.
+export function decodeImage(bytes: Uint8Array, imageFormat: ImageFormat, layer: LayerInfo, slice: number = 0): Uint8Array {
+    const from = start(bytes, imageFormat, layer, slice)
+    const { width, height } = layer.shape
+    const result = new Uint8Array(width * height * 4)
+
+    const asBytes = bytesBlocks[imageFormat]
+    if (asBytes) {
+        eachBlock(bytes, from, imageFormat, layer, asBytes, (block, x, y, columns, rows) => {
+            const blockWidth = formatSizes[imageFormat].blockWidth
+            for (let i = 0; i < rows; i++) {
+                const source = i * blockWidth * 4
+                result.set(block.subarray(source, source + columns * 4), ((y + i) * width + x) * 4)
+            }
+        })
+        return result
+    }
+
+    const toByte = isSigned(imageFormat) ? (v: number) => unorm8((v + 1) / 2) : unorm8
+    const asFloats = floatBlocks[imageFormat]
+    if (asFloats) {
+        eachBlock(bytes, from, imageFormat, layer, asFloats, (block, x, y, columns, rows) => {
+            const blockWidth = formatSizes[imageFormat].blockWidth
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < columns; j++) {
+                    const s = (i * blockWidth + j) * 4
+                    const t = ((y + i) * width + x + j) * 4
+                    result[t] = toByte(block[s])
+                    result[t + 1] = toByte(block[s + 1])
+                    result[t + 2] = toByte(block[s + 2])
+                    result[t + 3] = unorm8(block[s + 3])
+                }
+            }
+        })
+        return result
+    }
+
+    // Only red and green are ever signed; blue, left 0, and alpha, 1, are not.
+    const floats = uncompressedFloat(bytes, from, imageFormat, layer)
+    for (let i = 0; i < floats.length; i++) result[i] = (i & 3) < 2 ? toByte(floats[i]) : unorm8(floats[i])
+    return result
+}
+
+// Decode one image of the file to RGBA floats, rows top to bottom: HDR
+// values as they are, signed ones in [-1, 1], and 8-bit ones divided by 255.
+export function decodeImageFloat(bytes: Uint8Array, imageFormat: ImageFormat, layer: LayerInfo, slice: number = 0): Float32Array {
+    const from = start(bytes, imageFormat, layer, slice)
+    const { width } = layer.shape
+
+    const asFloats = floatBlocks[imageFormat]
+    const asBytes = bytesBlocks[imageFormat]
+    if (asFloats || asBytes) {
+        const result = new Float32Array(width * layer.shape.height * 4)
+        const blockWidth = formatSizes[imageFormat].blockWidth
+        const put = (block: Uint8Array | Float32Array, x: number, y: number, columns: number, rows: number) => {
+            const scale = block instanceof Float32Array ? 1 : 1 / 255
+            for (let i = 0; i < rows; i++)
+                for (let j = 0; j < columns * 4; j++)
+                    result[((y + i) * width + x) * 4 + j] = block[i * blockWidth * 4 + j] * scale
+        }
+        if (asFloats) eachBlock(bytes, from, imageFormat, layer, asFloats, put)
+        else eachBlock(bytes, from, imageFormat, layer, asBytes!, put)
+        return result
+    }
+    if (isCompressed(imageFormat)) throw new Error(`${imageFormat} is not a format this can decode`)
+    return uncompressedFloat(bytes, from, imageFormat, layer)
 }

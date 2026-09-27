@@ -1,4 +1,5 @@
-import { ImageFormat, ImageInfo, LayerInfo } from './header-info'
+import { ImageFormat, ImageInfo, LayerInfo, ParseOptions, channelsOf, levelLength, plausible } from './header-info'
+import { align, u32 } from './bytes'
 
 enum InternalFormat
 {
@@ -222,115 +223,251 @@ enum InternalFormat
     RGBA16_SSCALED_GTC,
 }
 
-const magic: Uint8Array = new Uint8Array([0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A])
-const headerLenght: number = 13 * Uint32Array.BYTES_PER_ELEMENT
+// GL data types, for the unsized internal formats that need one to say
+// what their bytes are.
+const GL_UNSIGNED_BYTE: number = 0x1401
 
-//const endiannesPos: number = 0
-//const glTypePos: number = 1
-//const glTypeSizePos: number = 2
-//const glFormatPos: number = 3
-const glInternalFormatPos: number = 4
-//const glBaseInternalFormatPos: number = 5
-const widthPos: number = 6
-const heightPos: number = 7
-const depthPos: number = 8
-const layerCountPos: number = 9
-const faceCountPos: number = 10
-const levelCountPos: number = 11
-const byteOfKeyValuesDataPos: number = 12
+// Formats that are not in the table above under a sized name.
+const GL_ALPHA: number = 0x1906
+const GL_LUMINANCE: number = 0x1909
 
-// parse KTX header from file buffer. Specs:
-// https://registry.khronos.org/KTX/specs/1.0/ktxspec.v1.html
-export function parseKTXHeader(b: Buffer): ImageInfo | undefined {
-    if (b.length + b.byteOffset < magic.length) {
-        console.log('ops')
-        return undefined
-    }
+type Format = [ImageFormat, boolean] // the format, and whether it is sRGB
 
-    const headerMagic: Uint8Array = new Uint8Array(b.buffer, b.byteOffset, magic.length)
-    const isSame: boolean = magic.every(function(element, index) {
-        return element === headerMagic[index]
-    })
-
-    if (!isSame) {
-        return undefined
-    }
-
-    const header: Uint32Array = new Uint32Array(b.buffer, b.byteOffset + magic.length)
-    if (header.length < 13) {
-        return undefined
-    }
-
-    const glInternalFormat: number = header[glInternalFormatPos]
-    var imageType: ImageFormat | undefined = undefined
-    switch (glInternalFormat) {
+function fromGL(internalFormat: number, type: number): Format | undefined {
+    switch (internalFormat) {
         case InternalFormat.RGB_DXT1:
         case InternalFormat.RGBA_DXT1:
-            imageType = 'BC1'
-            break
+            return ['BC1', false]
+        case InternalFormat.SRGB_DXT1:
+        case InternalFormat.SRGB_ALPHA_DXT1:
+            return ['BC1', true]
         case InternalFormat.RGBA_DXT3:
-            imageType = 'BC2'
-            break
+            return ['BC2', false]
+        case InternalFormat.SRGB_ALPHA_DXT3:
+            return ['BC2', true]
         case InternalFormat.RGBA_DXT5:
-            imageType = 'BC3'
-            break
-        case InternalFormat.R_ATI1N_SNORM:
+            return ['BC3', false]
+        case InternalFormat.SRGB_ALPHA_DXT5:
+            return ['BC3', true]
         case InternalFormat.R_ATI1N_UNORM:
-            imageType = 'BC4'
-            break
-        case InternalFormat.RG_ATI2N_SNORM:
+            return ['BC4', false]
+        case InternalFormat.R_ATI1N_SNORM:
+            return ['BC4_SNORM', false]
         case InternalFormat.RG_ATI2N_UNORM:
-            imageType = 'BC5'
-            break
+            return ['BC5', false]
+        case InternalFormat.RG_ATI2N_SNORM:
+            return ['BC5_SNORM', false]
         case InternalFormat.RGB_BP_UNSIGNED_FLOAT:
+            return ['BC6H', false]
         case InternalFormat.RGB_BP_SIGNED_FLOAT:
-            imageType = 'BC6H'
-            break
+            return ['BC6H_SF16', false]
         case InternalFormat.RGB_BP_UNORM:
-            imageType = 'BC7'
-            break
-        default:
-            return undefined
+            return ['BC7', false]
+        case InternalFormat.SRGB_BP_UNORM:
+            return ['BC7', true]
+        case InternalFormat.RGBA8_UNORM:
+            return ['RGBA8', false]
+        case InternalFormat.SRGB8_ALPHA8:
+            return ['RGBA8', true]
+        case InternalFormat.RGB8_UNORM:
+            return ['RGB8', false]
+        case InternalFormat.SRGB8:
+            return ['RGB8', true]
+        case InternalFormat.BGRA8_UNORM:
+            return ['BGRA8', false]
+        case InternalFormat.R8_UNORM:
+            return ['R8', false]
+        case InternalFormat.RG8_UNORM:
+            return ['RG8', false]
+        case InternalFormat.R8_SNORM:
+            return ['R8_SNORM', false]
+        case InternalFormat.RG8_SNORM:
+            return ['RG8_SNORM', false]
+        case InternalFormat.R16_UNORM:
+            return ['R16', false]
+        case InternalFormat.RG16_UNORM:
+            return ['RG16', false]
+        case InternalFormat.R16_SNORM:
+            return ['R16_SNORM', false]
+        case InternalFormat.RG16_SNORM:
+            return ['RG16_SNORM', false]
+        case InternalFormat.L16:
+            return ['L16', false]
+        case InternalFormat.RGB10A2_UNORM:
+            return ['RGB10A2', false]
+        // GL_RGB565 is red in the top five bits, as B5G6R5 is.
+        case InternalFormat.R5G6B5:
+            return ['B5G6R5', false]
+        case InternalFormat.R16F:
+            return ['R16F', false]
+        case InternalFormat.RG16F:
+            return ['RG16F', false]
+        case InternalFormat.RGBA16F:
+            return ['RGBA16F', false]
+        case InternalFormat.R32F:
+            return ['R32F', false]
+        case InternalFormat.RG32F:
+            return ['RG32F', false]
+        case InternalFormat.RGBA32F:
+            return ['RGBA32F', false]
     }
+    // Unsized formats, as older writers use: what the bytes are is the type.
+    if (type === GL_UNSIGNED_BYTE) {
+        switch (internalFormat) {
+            case InternalFormat.RGBA_UNORM:
+                return ['RGBA8', false]
+            case InternalFormat.RGB_UNORM:
+                return ['RGB8', false]
+            case InternalFormat.BGRA_UNORM:
+                return ['BGRA8', false]
+            case GL_LUMINANCE:
+                return ['L8', false]
+            case GL_ALPHA:
+                return ['A8', false]
+        }
+    }
+    return undefined
+}
 
-    const width: number = header[widthPos]
-    const height: number = header[heightPos]
-    const depth: number = header[depthPos]
-    //const layers: number = header[layerCountPos]
-    //const faces: number = header[faceCountPos]
-    const levels: number = header[levelCountPos]
-    const metaBytes: number = header[byteOfKeyValuesDataPos]
-    const rawBuffer: Uint8Array = new Uint8Array(b.buffer, b.byteOffset + magic.length + headerLenght + metaBytes)
+const magic: Uint8Array = new Uint8Array([0xab, 0x4b, 0x54, 0x58, 0x20, 0x31, 0x31, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a])
+const magic2: Uint8Array = new Uint8Array([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a])
 
-    var currentOffset: number = rawBuffer.byteOffset
-    var workWidth = width
-    var workHeight = height
-    var layerInfo = new Array<LayerInfo>()
-    for (var i = 0; i < levels; i++) {
-        const imageSize: number = new Uint32Array(rawBuffer.buffer, currentOffset, 1)[0]
-        currentOffset += Uint32Array.BYTES_PER_ELEMENT
+// The header, identifier included: all of it that a parse reads in one go.
+export const KTX_HEADER_BYTES: number = 64
 
-        layerInfo.push({
-            offset: currentOffset,
-            length: imageSize,
-            shape: {
-                width: workWidth,
-                height: workHeight
+// Byte offsets of the header's fields, from
+// https://registry.khronos.org/KTX/specs/1.0/ktxspec.v1.html
+const at = {
+    endianness: 12,
+    glType: 16,
+    glFormat: 24,
+    glInternalFormat: 28,
+    width: 36,
+    height: 40,
+    depth: 44,
+    arrayElements: 48,
+    faces: 52,
+    levels: 56,
+    keyValueBytes: 60,
+}
+const LITTLE_ENDIAN: number = 0x04030201
+
+function same(bytes: Uint8Array, expected: Uint8Array): boolean {
+    return bytes.length >= expected.length && expected.every((value, i) => bytes[i] === value)
+}
+
+// What kind of file @head starts: a DDS, a KTX 1, or a KTX 2 — which this
+// cannot read yet, and which is worth telling apart from a file that is not
+// a texture at all.
+export function detectContainer(head: Uint8Array): 'dds' | 'ktx' | 'ktx2' | undefined {
+    if (head.length >= 4 && head[0] === 0x44 && head[1] === 0x44 && head[2] === 0x53 && head[3] === 0x20)
+        return 'dds'
+    if (same(head, magic)) return 'ktx'
+    if (same(head, magic2)) return 'ktx2'
+    return undefined
+}
+
+// The walk through a KTX file's levels, written once for both ways of
+// reading: it yields the position of each level's four-byte imageSize, and
+// is given back the number found there — or NaN if it could not be read.
+// So a file in memory and a file read by range go through the same checks.
+//
+// KTX 1 keeps, for each level, its imageSize and then every array element's
+// every face; a cube map that is not an array pads each face to four bytes,
+// and every level is padded to four bytes after it.
+export function* walkKTX(
+    head: Uint8Array,
+    fileSize: number,
+    options?: ParseOptions,
+): Generator<number, ImageInfo | undefined, number> {
+    if (head.length < KTX_HEADER_BYTES || !same(head, magic)) return undefined
+    // A file written big-endian would need every value swapped; none is
+    // known in the wild, and it is refused rather than misread.
+    if (u32(head, at.endianness) !== LITTLE_ENDIAN) return undefined
+
+    const format = fromGL(u32(head, at.glInternalFormat), u32(head, at.glType))
+    if (!format) return undefined
+    const [imageFormat, srgb] = format
+
+    const width = u32(head, at.width)
+    // 0 is how KTX says a dimension is not used: a 1D texture has no height.
+    const height = Math.max(1, u32(head, at.height))
+    const depth = Math.max(1, u32(head, at.depth))
+    const arrayElements = u32(head, at.arrayElements)
+    const arraySize = Math.max(1, arrayElements)
+    const faces = u32(head, at.faces)
+    // 0 asks a GL loader to make the levels; one is stored.
+    const levels = Math.max(1, u32(head, at.levels))
+    const keyValueBytes = u32(head, at.keyValueBytes)
+
+    if (faces !== 1 && faces !== 6) return undefined
+    if (!plausible(width, height, depth, levels, faces, arraySize, options)) return undefined
+    if (KTX_HEADER_BYTES + keyValueBytes > fileSize) return undefined
+
+    const cubeNotArray = faces === 6 && arrayElements === 0
+    const layers = new Array<LayerInfo>()
+    let position = KTX_HEADER_BYTES + keyValueBytes
+    let w = width
+    let h = height
+    let d = depth
+    for (let level = 0; level < levels; level++) {
+        if (position + 4 > fileSize) return undefined
+        const imageSize: number = yield position
+        const { rowPitch, length } = levelLength(imageFormat, w, h, d, 4)
+        // imageSize is one face for a cube map that is not an array, and the
+        // whole level otherwise. Anything else is a file this does not
+        // understand, or one that lies — and a size is not trusted to say
+        // where the next level is until it has been checked.
+        const expected = cubeNotArray ? length : length * faces * arraySize
+        if (imageSize !== expected) return undefined
+
+        const start = position + 4
+        const faceStride = cubeNotArray ? align(length, 4) : length
+        for (let arrayIndex = 0; arrayIndex < arraySize; arrayIndex++) {
+            for (let face = 0; face < faces; face++) {
+                const offset = start + (arrayIndex * faces + face) * faceStride
+                if (offset + length > fileSize) return undefined
+                layers.push({
+                    offset,
+                    length,
+                    shape: { width: w, height: h },
+                    level,
+                    face,
+                    arrayIndex,
+                    depth: d,
+                    rowPitch,
+                })
             }
-        })
-
-        currentOffset += imageSize
-
-        workWidth >>= 1
-        workHeight >>= 1
+        }
+        position = align(start + faceStride * faces * arraySize, 4)
+        w = Math.max(1, w >> 1)
+        h = Math.max(1, h >> 1)
+        d = Math.max(1, d >> 1)
     }
 
     return {
-        shape: {
-            width: width,
-            height: height,
-        },
-        layers: layerInfo,
-        format: imageType
+        container: 'ktx',
+        shape: { width, height },
+        layers,
+        format: imageFormat,
+        srgb,
+        channels: channelsOf(imageFormat),
+        levels,
+        faces,
+        arraySize,
+        depth,
     }
+}
+
+// Parse a KTX 1 file held whole in @bytes, and say where every image in it
+// is. Answers undefined for anything it cannot read, and for any file whose
+// numbers cannot be right.
+export function parseKTXHeader(bytes: Uint8Array, options?: ParseOptions): ImageInfo | undefined {
+    const walk = walkKTX(bytes, bytes.length, options)
+    let step = walk.next()
+    while (!step.done) {
+        const position = step.value
+        step = walk.next(position + 4 <= bytes.length ? u32(bytes, position) : NaN)
+    }
+    return step.value
 }

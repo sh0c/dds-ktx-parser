@@ -1,8 +1,14 @@
 import { FormatSize, formatSizes } from '../header-info'
 import { blockExtractBits } from './extract-bits'
+import { blockWords, halfToFloat } from '../bytes'
 import { bptcTableP2, bptcTableAnchorIndexSecondSubset } from './bptc-tables'
 
 const rgbaPixelSize: number = formatSizes['RGBA'].blockSize
+
+// One block's pixels as RGBA floats, reused: decodeImage copies them out
+// before the next block.
+const out = new Float32Array(64)
+const words = new Uint32Array(4)
 
 const bc6hTableMode = new Int32Array([0, 1, 2, 10, -1, -1, 3, 11, -1, -1, 4, 12, -1, -1, 5, 13,
 	                                  -1, -1, 6, -1, -1, -1, 7, -1, -1, -1, 8, -1, -1, -1, 9, -1])
@@ -102,43 +108,14 @@ function signInterpolateFloat(e0: number, e1: number, index: number, indexPrecis
     return val
 }
 
-function float16ToFloat32(x: number): number {
-    const s: number = x >> 15
-    var e: number = x >> 10 & 0x1F
-    var f: number = x & 0x3FF
-
-    f <<= 23 - 10
-    switch (e) {
-        case 0:
-            if (f != 0) {
-                e = 1 + (127 - 15)
-                while (f < 0x7FFFF) {
-                    f <<= 1
-                    e -= 1
-                }
-
-                f &= 0x7FFFF
-            }
-            break
-        case 31:
-            e = 255
-            break
-        default:
-            e += 127 - 15
-            break
-    }
-
-    const uintBuffer = new Uint32Array([s << 31 | e << 23 | f])
-    const floatBuffer = new Float32Array(uintBuffer.buffer)
-
-    return floatBuffer[0]
-}
-
-export function decodeBC6HBlock(inputBuffer: Uint8Array, size: FormatSize): Buffer {
-    const data = new Uint32Array(inputBuffer.buffer, inputBuffer.byteOffset, 4)
+// Decode one block to RGBA floats. HDR values run past 1.0; they are for
+// the caller to clamp, or to show with an exposure, not for this to wrap.
+// @signed is BC6H_SF16, whose path was written but never switched on.
+export function decodeBC6HBlock(inputBuffer: Uint8Array, size: FormatSize, signed: boolean = false): Float32Array {
+    const data = blockWords(inputBuffer, words)
     const [mode, moveIndex] = extractMode(data)
     var index: number = moveIndex
-    const signedFlag: boolean = false
+    const signedFlag: boolean = signed
     
     var r = new Int32Array(4)
     var g = new Int32Array(4)
@@ -819,7 +796,7 @@ export function decodeBC6HBlock(inputBuffer: Uint8Array, size: FormatSize): Buff
     }
 
     const blockSizeInPixels: number = size.blockWidth * size.blockHeight
-    var outputBuffer = Buffer.alloc(blockSizeInPixels * rgbaPixelSize)
+    var outputBuffer = out.fill(0)
     for (var i = 0; i < blockSizeInPixels; i++) {
         const idx: number = 2 * subsetIndex[i]
         const endpointStartR: number = r[idx]
@@ -843,10 +820,10 @@ export function decodeBC6HBlock(inputBuffer: Uint8Array, size: FormatSize): Buff
             b16 = Math.floor(interpolateFloat(endpointStartB, endpointEndB, colorIndex[i], colorIndexBitCount) * 31 / 64)
         }
 
-        outputBuffer[i * rgbaPixelSize]  = float16ToFloat32(r16) * 255 + 0.5
-        outputBuffer[i * rgbaPixelSize + 1] = float16ToFloat32(g16) * 255 + 0.5
-        outputBuffer[i * rgbaPixelSize + 2] = float16ToFloat32(b16) * 255 + 0.5
-        outputBuffer[i * rgbaPixelSize + 3] = 0xFF
+        outputBuffer[i * rgbaPixelSize]  = halfToFloat(r16)
+        outputBuffer[i * rgbaPixelSize + 1] = halfToFloat(g16)
+        outputBuffer[i * rgbaPixelSize + 2] = halfToFloat(b16)
+        outputBuffer[i * rgbaPixelSize + 3] = 1
     }
 
     return outputBuffer

@@ -1,5 +1,6 @@
 import { FormatSize, formatSizes } from '../header-info'
 import { blockExtractBits } from './extract-bits'
+import { blockWords } from '../bytes'
 import { bptcTableP2,
          bptcTableP3, 
          bptcTableAnchorIndexSecondSubset,
@@ -20,6 +21,10 @@ const bc7TableAWeight4 = new Uint8Array([
 ])
 
 const rgbaPixelSize: number = formatSizes['RGBA'].blockSize
+
+// One block's pixels, reused: decodeImage copies them out before the next block.
+const out = new Uint8Array(64)
+const words = new Uint32Array(4)
 
 function extractMode(byte: number): number {
     for (var i = 0; i < 8; i++) {
@@ -59,7 +64,7 @@ const bc7TableModeHasPBits = new Uint8Array([ 1, 1, 0, 1, 0, 0, 1, 1 ])
 const bc7TableInterpalationBits = new Uint8Array([ 3, 3, 2, 2, 2, 2, 4, 2 ])
 const bc7TableInterpalationBits2 = new Uint8Array([ 0, 0, 0, 0, 3, 2, 0, 0 ])
 
-function decoodeBlockBC7Mode1(inputBuffer: Uint8Array, size: FormatSize): Buffer {
+function decoodeBlockBC7Mode1(inputBuffer: Uint8Array, size: FormatSize): Uint8Array {
     const partitionSetID: number = inputBuffer[0] >> 2
     const endpoint = new Uint8Array(12)
     endpoint[0] = inputBuffer[1] & 0x3F // red, subnet 0, endpoint 0
@@ -115,7 +120,7 @@ function decoodeBlockBC7Mode1(inputBuffer: Uint8Array, size: FormatSize): Buffer
     var idx: number = 0
 
     const blockSizeInPixels: number = size.blockWidth * size.blockHeight
-    var outputBuffer = Buffer.alloc(blockSizeInPixels * rgbaPixelSize)
+    var outputBuffer = out.fill(0)
     for (var i = 0; i < 16; i++) {
         var colorIndex: number = 0
 
@@ -150,8 +155,8 @@ function decoodeBlockBC7Mode1(inputBuffer: Uint8Array, size: FormatSize): Buffer
     return outputBuffer
 }
 
-export function decodeBC7Block(inputBuffer: Uint8Array, size: FormatSize): Buffer {
-    const data = new Uint32Array(inputBuffer.buffer, inputBuffer.byteOffset, 4)
+export function decodeBC7Block(inputBuffer: Uint8Array, size: FormatSize): Uint8Array {
+    const data = blockWords(inputBuffer, words)
     const mode = extractMode(inputBuffer[0])
     var index: number = mode + 1
 
@@ -361,7 +366,7 @@ export function decodeBC7Block(inputBuffer: Uint8Array, size: FormatSize): Buffe
     var endpointEnd = new Uint8Array(4)
 
     const blockSizeInPixels: number = size.blockWidth * size.blockHeight
-    var outputBuffer = Buffer.alloc(blockSizeInPixels * rgbaPixelSize)
+    var outputBuffer = out.fill(0)
     for (var i = 0; i < blockSizeInPixels; i++) {
         for (var j = 0; j < 4; j++) {
             endpointStart[j] = endpoint[2 * subsetIndex[i] * 4 + j]

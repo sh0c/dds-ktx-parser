@@ -1,1 +1,1 @@
-export { decodeImage } from './decode'
+export { decodeImage, decodeImageFloat } from './decode'

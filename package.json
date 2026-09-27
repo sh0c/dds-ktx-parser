@@ -1,13 +1,21 @@
 {
   "name": "dds-ktx-parser",
-  "version": "1.0.1",
-  "description": "Parse image files with DDS and KTX format and decode some of formats to RGB/RGBA array.",
+  "version": "2.0.0",
+  "description": "Parse DDS and KTX textures, reading only the bytes needed, and decode BC1-BC7 and uncompressed formats to RGBA. No dependencies; runs in Node, browsers and workers.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
   "files": [
-      "dist"
-   ],
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "jest"
@@ -16,7 +24,11 @@
     "dds",
     "ktx",
     "parser",
-    "decoder"
+    "decoder",
+    "bc1",
+    "bc7",
+    "bc6h",
+    "texture"
   ],
   "author": "sh0c",
   "license": "MIT",
