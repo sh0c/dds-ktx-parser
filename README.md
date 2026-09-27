@@ -68,9 +68,7 @@ past the limit (16384 by default; `{ maxDimension }` to change it), more
 mip levels than halving allows, an image past the end of the file, a KTX
 level whose size does not add up — answers `undefined`. `detectContainer`
 says what kind of file it is, and `describeKTX2` what a KTX 2 file holds
-that is not read: Basis Universal (ETC1S or UASTC, which need a transcoder
-this package does not have), ETC, ASTC and other formats with no decoder
-here.
+that is not read: PVRTC and other formats with no decoder here.
 
 ## Decoding
 
@@ -86,7 +84,7 @@ Channels a format has not got are 0 and alpha is 1, as a GPU samples them;
 |---|---|
 | block compressed | BC1 (DXT1), BC2 (DXT2, DXT3), BC3 (DXT4, DXT5), BC4, BC4_SNORM, BC5, BC5_SNORM, BC6H, BC6H_SF16, BC7 — sRGB variants included |
 | mobile | ETC1, ETC2 RGB, RGB A1 and RGBA, EAC R11 and RG11 signed and unsigned; ASTC in all fourteen 2D block sizes, LDR, sRGB and HDR |
-| Basis Universal | UASTC (LDR 4×4), in KTX 2, stored or with Zstandard |
+| Basis Universal | UASTC (LDR 4×4), in KTX 2, stored or with Zstandard; ETC1S, in KTX 2 with BasisLZ |
 | 8 bits a channel | RGBA8, RGBX8, BGRA8, BGRX8, RGB8, BGR8, R8, RG8, R8_SNORM, RG8_SNORM, L8, A8 |
 | 16 bits a channel | R16, RG16, R16_SNORM, RG16_SNORM, L16 |
 | packed | RGB10A2, B5G6R5, B5G5R5A1, B4G4R4A4 |
@@ -94,12 +92,19 @@ Channels a format has not got are 0 and alpha is 1, as a GPU samples them;
 
 DDS with and without the DX10 header, cube maps, arrays and volume textures;
 KTX 1, little-endian, with its row padding; KTX 2, stored or supercompressed
-with Zstandard or zlib; and astcenc's `.astc` files. Not yet: Basis
-Universal's ETC1S (BasisLZ), which `describeKTX2` names.
+with Zstandard, zlib or BasisLZ; and astcenc's `.astc` files.
+
+ETC1S is not blocks in the file but a stream decoded against palettes the
+whole file shares, so its images are read with `readLayer`, which reads the
+palettes and that image's own slices — two reads, never its whole level —
+and hands them over together for `decodeImage(bytes, format, { ...layer,
+offset: 0 })`, as it does a supercompressed level. Grey ETC1S is given in
+red, green and blue, and a second slice as alpha, as Basis Universal's own
+transcoder gives them.
 
 The mobile and Basis decoders were compared, value for value, with the
 reference decoders — etcdec for ETC, ARM's astcenc for ASTC, KTX-Software for
-UASTC — on encoded and random blocks; `tests/oracle` says how, and how to run
+UASTC and ETC1S — on encoded and random blocks; `tests/oracle` says how, and how to run
 it again. The tests hold them to what those comparisons found.
 
 BC6H_SF16 has no reference file, so `tests/bc6h-signed.test.ts` checks it
@@ -126,8 +131,8 @@ header says how to fetch them.
 - No Node `Buffer`: takes and returns `Uint8Array`, so it runs in a browser.
   `decodeImage` returns a `Uint8Array`.
 - KTX 2, stored or supercompressed, with `readLayer` to read one image.
-- ETC1, ETC2, EAC, ASTC (every 2D size, LDR, sRGB, HDR) and UASTC, each
-  compared with its reference decoder.
+- ETC1, ETC2, EAC, ASTC (every 2D size, LDR, sRGB, HDR), UASTC and ETC1S
+  (BasisLZ), each compared with its reference decoder.
 - Uncompressed formats, signed BC4 and BC5, BC6H as floats
   (`decodeImageFloat`) and signed BC6H checked against the specification,
   HDR packed formats, sRGB, channels, cube maps, arrays and volume textures.

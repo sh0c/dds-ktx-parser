@@ -59,7 +59,7 @@ Two things the comparison settled that the specification leaves open:
 - astcenc decodes a negative channel of an HDR void-extent block as NaN;
   this package does too.
 
-## UASTC: KTX-Software
+## UASTC and ETC1S: KTX-Software
 
 [KTX-Software](https://github.com/KhronosGroup/KTX-Software)'s `ktx` tool
 (Apache 2.0), from a release — check it against the release's `.sha1`. It
@@ -71,6 +71,8 @@ the command, which may run it in WSL from Windows:
 $ KTX=path/to/ktx npx ts-node tests/oracle/compare-uastc.ts
 $ KTX="wsl -d Ubuntu-22.04 -- /path/to/ktx" npx ts-node tests/oracle/compare-uastc.ts
 $ KTX=path/to/ktx npx ts-node tests/oracle/record-uastc.ts
+$ KTX=path/to/ktx npx ts-node tests/oracle/compare-etc1s.ts
+$ KTX=path/to/ktx npx ts-node tests/oracle/record-etc1s.ts
 ```
 
 `compare-uastc.ts` encodes generated images — colour and alpha, opaque, grey
@@ -83,3 +85,17 @@ What the comparison settled: Basis's transcoder decodes UASTC without sRGB's
 widening whatever the transfer function — so does this package, which moves
 some sRGB values by one from what an ASTC decoder would give — and a file
 whose data format descriptor has no alpha is decoded with alpha 255.
+
+`compare-etc1s.ts` encodes generated images with `ktx create --encode
+basis-lz` — colour and alpha, opaque, grey, grey and alpha, smooth — linear
+and sRGB at quality 1, 128 and 255; with mipmaps from 61 × 37; an array of
+three with mipmaps; a cube map; the most endpoints and selectors, and 16 of
+each — and compares every value of every image with `ktx transcode --target
+rgba8`'s, reading each image by range as an application would. Last run: 36
+files, identical on all of them; so was KTX-Software's own
+`cubemap_yokohama_blze.ktx2`, 72 images from an older encoder.
+
+`ktx transcode` gives a grey file back in the channels it was made from —
+grey in red, and alpha in green — where this package gives grey in red,
+green and blue and alpha as alpha, as Basis's RGBA output does; the scripts
+compare them so.

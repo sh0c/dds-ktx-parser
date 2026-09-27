@@ -8,7 +8,7 @@
 // `ktx`'s own decoding of them (tests/golden/uastc.json).
 import * as crypto from 'crypto'
 import * as fs from 'fs'
-import { decodeImage, describeKTX2, inMemory, readImageInfo } from '../src'
+import { decodeImage, inMemory, readImageInfo } from '../src'
 import { decodeUASTCBlock } from '../src/decode/uastc'
 
 const golden: Record<string, string> = JSON.parse(fs.readFileSync('tests/golden/uastc.json', 'utf8'))
@@ -47,11 +47,4 @@ test('a solid-colour block, and the reserved mode, which is the error colour', (
     reserved[0] = 0x45
     expect(Array.from(decodeUASTCBlock(reserved, false).subarray(0, 4))).toEqual([255, 0, 255, 255])
     void bits
-})
-
-test('ETC1S is still described, not decoded', () => {
-    const bytes = new Uint8Array(200)
-    bytes.set([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a])
-    new DataView(bytes.buffer).setUint32(44, 1, true) // BasisLZ
-    expect(describeKTX2(bytes)?.supercompression).toBe('basislz')
 })

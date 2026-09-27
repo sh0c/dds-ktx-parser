@@ -73,9 +73,17 @@ when("KTX-Software's own files", () => {
         }
     })
 
-    test('Basis Universal is said to be what it is', async () => {
+    test('an ETC1S cube map, BasisLZ, every face read by range', async () => {
         const basis = load('cubemap_yokohama_blze.ktx2')
-        expect(await readImageInfo(inMemory(basis), basis.length)).toBeUndefined()
         expect(describeKTX2(basis)).toMatchObject({ vkFormat: 0, supercompression: 'basislz', colorModel: 163 })
+        const info = (await readImageInfo(inMemory(basis), basis.length))!
+        expect([info.format, info.faces, info.supercompression]).toEqual(['ETC1S_RGB', 6, 'basislz'])
+        for (let face = 0; face < 6; face++) {
+            const { layer, bytes } = await level(basis, 0, face)
+            const decoded = decodeImage(bytes, info.format, { ...layer, offset: 0 })
+            expect(decoded.length).toBe(layer.shape.width * layer.shape.height * 4)
+            // A photograph: not one colour.
+            expect(new Set(Array.from({ length: 64 }, (_, i) => decoded[i * 997 * 4])).size).toBeGreaterThan(4)
+        }
     })
 })

@@ -58,7 +58,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## Basis Universal v2_50 — UASTC decoding, ported
+## Basis Universal v2_50 — UASTC and ETC1S decoding, ported
 
 https://github.com/BinomialLLC/basis_universal
 
@@ -67,6 +67,15 @@ decoding in `transcoder/basisu_transcoder.cpp` (`unpack_uastc`), changed from
 the original: rewritten in TypeScript, reading only what decoding needs, and
 using this package's ASTC tables and partition hash. Its mode tables and
 partition seeds are Basis Universal's.
+
+`src/decode/etc1s.ts` is a TypeScript port of the ETC1S decoding in
+`transcoder/basisu_transcoder.cpp` and `basisu_transcoder_internal.h`
+(`basisu_lowlevel_etc1s_transcoder`'s `decode_palettes`, `decode_tables` and
+`transcode_slice`, with `bitwise_decoder`, `read_huffman_table` and
+`approx_move_to_front`), changed from the original: rewritten in TypeScript,
+decoding only to RGBA, and with a counting Huffman decoder in place of its
+lookup tables. Its constants and ETC1 intensity table are Basis
+Universal's.
 
 Basis Universal's NOTICE:
 

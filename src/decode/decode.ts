@@ -11,6 +11,7 @@ import {
 } from '../header-info'
 import { decodeASTCBytes, decodeASTCFloat } from './astc'
 import { decodeUASTCBlock } from './uastc'
+import { decodeETC1S } from './etc1s'
 
 // UASTC decoded as Basis's own transcoder decodes it to RGBA: without
 // sRGB's widening whatever the file's transfer function — which moves some
@@ -133,6 +134,14 @@ function uncompressedFloat(bytes: Uint8Array, from: number, format: ImageFormat,
     return result
 }
 
+// ETC1S is decoded whole, from the image as readLayer gathers it — @bytes
+// from @layer's offset, which readLayer's caller sets to 0.
+const isETC1S = (format: ImageFormat): boolean => format === 'ETC1S_RGB' || format === 'ETC1S_RGBA'
+function etc1s(bytes: Uint8Array, layer: LayerInfo, slice: number): Uint8Array {
+    if (slice !== 0) throw new RangeError(`this level has 1 slice; there is no slice ${slice}`)
+    return decodeETC1S(bytes.subarray(layer.offset), layer.shape.width, layer.shape.height)
+}
+
 // Decode one image of the file to RGBA, a byte a channel, rows top to bottom.
 // @bytes is the whole file, or any part of it that holds this image, with
 // @layer's offset counted from its start. @slice picks the depth slice of a
@@ -141,6 +150,7 @@ function uncompressedFloat(bytes: Uint8Array, from: number, format: ImageFormat,
 // HDR values past 1.0 are clamped to 255 — decodeImageFloat has them as
 // they are. Signed formats show -1 as 0 and 1 as 255.
 export function decodeImage(bytes: Uint8Array, imageFormat: ImageFormat, layer: LayerInfo, slice: number = 0): Uint8Array {
+    if (isETC1S(imageFormat)) return etc1s(bytes, layer, slice)
     const from = start(bytes, imageFormat, layer, slice)
     const { width, height } = layer.shape
     const result = new Uint8Array(width * height * 4)
@@ -185,6 +195,7 @@ export function decodeImage(bytes: Uint8Array, imageFormat: ImageFormat, layer: 
 // Decode one image of the file to RGBA floats, rows top to bottom: HDR
 // values as they are, signed ones in [-1, 1], and 8-bit ones divided by 255.
 export function decodeImageFloat(bytes: Uint8Array, imageFormat: ImageFormat, layer: LayerInfo, slice: number = 0): Float32Array {
+    if (isETC1S(imageFormat)) return Float32Array.from(etc1s(bytes, layer, slice), (v) => v / 255)
     const from = start(bytes, imageFormat, layer, slice)
     const { width } = layer.shape
 

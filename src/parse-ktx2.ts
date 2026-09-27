@@ -210,10 +210,22 @@ const UASTC_CHANNELS: Record<number, [ImageFormat, Channels]> = {
     6: ['UASTC_RGB', 'RG'],
 }
 
+// KHR_DF_MODEL_ETC1S and its channel ids — one sample for each slice: RGB
+// or RRR for colour, then GGG or AAA when there is a second, which Basis
+// decodes into alpha.
+const MODEL_ETC1S = 163
+function etc1sChannels(channels: number[]): [ImageFormat, Channels] | undefined {
+    const [first, second] = channels
+    if (channels.length === 1 && (first === 0 || first === 3)) return ['ETC1S_RGB', first === 0 ? 'RGB' : 'L']
+    if (channels.length === 2 && (first === 0 || first === 3) && (second === 15 || second === 4))
+        return ['ETC1S_RGBA', first === 0 ? 'RGBA' : 'LA']
+    return undefined
+}
+
 // What a KTX 2 file is, for saying why one is not shown: its VkFormat, its
 // supercompression, and — when @head reaches that far — the colour model of
 // its data format descriptor: 163 is ETC1S and 166 is UASTC, the two forms
-// of Basis Universal, which need a transcoder this package does not have.
+// of Basis Universal.
 export function describeKTX2(head: Uint8Array):
     | { vkFormat: number; supercompression: string; colorModel?: number; width: number; height: number; levels: number }
     | undefined {
@@ -237,9 +249,8 @@ export function describeKTX2(head: Uint8Array):
 // level to read, and how to decompress it; their `offset` is then counted
 // within the decompressed level. readLayer does both.
 //
-// Answers undefined for what it cannot read: Basis Universal (a VkFormat of
-// 0, or BasisLZ), formats it has no decoder for (ETC, ASTC and others), and
-// any header whose numbers cannot be right.
+// Answers undefined for what it cannot read: formats it has no decoder for
+// (PVRTC and others), and any header whose numbers cannot be right.
 export function parseKTX2Header(
     bytes: Uint8Array,
     fileSize: number = bytes.length,
@@ -259,8 +270,15 @@ export function parseKTX2Header(
             format = [uastc, dfd.transfer === 2]
             channels = which
         }
+        const etc1s = dfd?.colorModel === MODEL_ETC1S && compression === 'basislz' ? etc1sChannels(dfd.channels) : undefined
+        if (etc1s) {
+            format = [etc1s[0], dfd!.transfer === 2]
+            channels = etc1s[1]
+        }
     }
-    if (!format || !compression || compression === 'basislz') return undefined
+    if (!format || !compression) return undefined
+    const basis = compression === 'basislz'
+    if (basis && !format[0].startsWith('ETC1S_')) return undefined
     const [imageFormat, srgb] = format
 
     const width = u32(bytes, at.pixelWidth)
@@ -272,6 +290,16 @@ export function parseKTX2Header(
     if (faces !== 1 && faces !== 6) return undefined
     if (!plausible(width, height, depth, levels, faces, arraySize, options)) return undefined
     if (bytes.length < KTX2_HEADER_BYTES + levels * LEVEL_ENTRY_BYTES) return undefined
+
+    // BasisLZ's global data: where it is, and how many images it indexes —
+    // level 0's first, each level's in the order of their data.
+    const global = { offset: u64(bytes, 64), length: u64(bytes, 72) }
+    let imageCount = 0
+    if (basis) {
+        if (depth > 1) return undefined
+        imageCount = levels * faces * arraySize
+        if (!(global.offset > 0) || !(global.length >= 20 + imageCount * 20) || global.offset + global.length > fileSize) return undefined
+    }
 
     const layers = new Array<LayerInfo>()
     let w = width
@@ -287,13 +315,13 @@ export function parseKTX2Header(
         // KTX 2 packs rows tightly, and faces and layers one after another.
         const { rowPitch, length } = levelLength(imageFormat, w, h, d)
         const whole = length * faces * arraySize
-        if (compression === 'none' ? byteLength !== whole : uncompressed !== whole) return undefined
+        if (basis ? uncompressed !== 0 : compression === 'none' ? byteLength !== whole : uncompressed !== whole) return undefined
 
         for (let arrayIndex = 0; arrayIndex < arraySize; arrayIndex++) {
             for (let face = 0; face < faces; face++) {
                 const within = (arrayIndex * faces + face) * length
                 layers.push({
-                    offset: compression === 'none' ? byteOffset + within : within,
+                    offset: compression === 'none' ? byteOffset + within : basis ? 0 : within,
                     length,
                     shape: { width: w, height: h },
                     level,
@@ -303,7 +331,17 @@ export function parseKTX2Header(
                     rowPitch,
                     ...(compression === 'none'
                         ? {}
-                        : { source: { offset: byteOffset, length: byteLength, scheme: compression, uncompressedLength: whole } }),
+                        : compression === 'basislz'
+                          ? {
+                                source: {
+                                    ...global,
+                                    scheme: compression,
+                                    image: (level * arraySize + arrayIndex) * faces + face,
+                                    imageCount,
+                                    level: { offset: byteOffset, length: byteLength },
+                                },
+                            }
+                          : { source: { offset: byteOffset, length: byteLength, scheme: compression, uncompressedLength: whole } }),
                 })
             }
         }

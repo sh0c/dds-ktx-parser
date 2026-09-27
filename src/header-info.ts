@@ -33,6 +33,11 @@ export type CompressedFormat =
     // says it has none is opaque whatever its blocks hold.
     | 'UASTC_RGBA'
     | 'UASTC_RGB'
+    // Basis Universal's ETC1S, which BasisLZ always supercompresses: an
+    // image is not blocks in the file but a stream decoded against palettes
+    // the file shares, so readLayer gathers it and decodeImage decodes that.
+    | 'ETC1S_RGBA'
+    | 'ETC1S_RGB'
 
 // ASTC, in each of its fourteen 2D block sizes, three ways: LDR, sRGB and
 // HDR decode the same bits differently, so each is a format of its own.
@@ -116,12 +121,26 @@ export interface LayerInfo {
     // Only in a supercompressed KTX 2: the stored level this image is in,
     // to read and decompress, and `offset` is then counted within the
     // decompressed level. readLayer does both.
-    readonly source?: {
-        readonly offset: number
-        readonly length: number
-        readonly scheme: 'zstd' | 'zlib'
-        readonly uncompressedLength: number
-    }
+    //
+    // For BasisLZ, `source` is where the file's shared palettes and image
+    // index are, which image this is in that index, and its level's stored
+    // range; readLayer hands over the image gathered with its palettes, from
+    // offset 0.
+    readonly source?:
+        | {
+              readonly offset: number
+              readonly length: number
+              readonly scheme: 'zstd' | 'zlib'
+              readonly uncompressedLength: number
+          }
+        | {
+              readonly offset: number
+              readonly length: number
+              readonly scheme: 'basislz'
+              readonly image: number
+              readonly imageCount: number
+              readonly level: { readonly offset: number; readonly length: number }
+          }
 }
 
 export interface ImageInfo {
@@ -140,7 +159,7 @@ export interface ImageInfo {
     readonly arraySize: number
     readonly depth: number
     // how the levels are stored: only KTX 2 supercompresses
-    readonly supercompression: 'none' | 'zstd' | 'zlib'
+    readonly supercompression: 'none' | 'zstd' | 'zlib' | 'basislz'
 }
 
 export interface FormatSize {
@@ -173,6 +192,9 @@ export const formatSizes: Record<string, FormatSize> = {
     EAC_RG11_SNORM: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
     UASTC_RGBA: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
     UASTC_RGB: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
+    // What ETC1S would take as ETC1 blocks: it is stored smaller than this.
+    ETC1S_RGBA: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
+    ETC1S_RGB: { blockWidth: 4, blockHeight: 4, blockSize: 8 },
     RGBA8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     RGBX8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     BGRA8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
@@ -238,6 +260,8 @@ const channelsOfFormat: Record<Exclude<ImageFormat, AstcFormat>, Channels> = {
     EAC_RG11_SNORM: 'RG',
     UASTC_RGBA: 'RGBA',
     UASTC_RGB: 'RGB',
+    ETC1S_RGBA: 'RGBA',
+    ETC1S_RGB: 'RGB',
     RGBA8: 'RGBA',
     RGBX8: 'RGB',
     BGRA8: 'RGBA',

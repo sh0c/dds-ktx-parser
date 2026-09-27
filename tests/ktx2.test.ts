@@ -181,7 +181,7 @@ describe('cube maps and arrays', () => {
 })
 
 describe('what is not read, and why', () => {
-    test('Basis Universal is described, not parsed', async () => {
+    test('BasisLZ with no descriptor to say it is ETC1S is described, not parsed', async () => {
         const basis = ktx2({ vkFormat: 0, width: 64, height: 64, levels: [new Uint8Array(16)], scheme: 1 })
         expect(detectContainer(basis)).toBe('ktx2')
         expect(await readImageInfo(inMemory(basis), basis.length)).toBeUndefined()
