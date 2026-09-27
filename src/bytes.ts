@@ -36,13 +36,17 @@ export function halfToFloat(x: number): number {
     f <<= 23 - 10
     switch (e) {
         case 0:
+            // A subnormal: shift the mantissa up until its leading one is the
+            // implicit bit 23, and take one off the exponent a shift. The
+            // code this came from stopped at bit 19 and kept 19 bits, which
+            // made every subnormal wrong — 0x0001 came out 16 times too big.
             if (f !== 0) {
                 e = 1 + (127 - 15)
-                while (f < 0x7ffff) {
+                while ((f & 0x800000) === 0) {
                     f <<= 1
                     e -= 1
                 }
-                f &= 0x7ffff
+                f &= 0x7fffff
             }
             break
         case 31:

@@ -304,6 +304,14 @@ function fromGL(internalFormat: number, type: number): Format | undefined {
             return ['RG16F', false]
         case InternalFormat.RGBA16F:
             return ['RGBA16F', false]
+        case InternalFormat.RGB16F:
+            return ['RGB16F', false]
+        case InternalFormat.RGB32F:
+            return ['RGB32F', false]
+        case InternalFormat.RG11B10F:
+            return ['RG11B10F', false]
+        case InternalFormat.RGB9E5:
+            return ['RGB9E5', false]
         case InternalFormat.R32F:
             return ['R32F', false]
         case InternalFormat.RG32F:
@@ -456,6 +464,7 @@ export function* walkKTX(
         faces,
         arraySize,
         depth,
+        supercompression: 'none',
     }
 }
 

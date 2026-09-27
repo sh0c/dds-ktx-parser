@@ -48,9 +48,8 @@ for (const name of fixtures) {
         const info = (await readImageInfo(counting(bytes).read, bytes.length))!
         for (const layer of info.layers) {
             const own = bytes.slice(layer.offset, layer.offset + layer.length)
-            expect(decodeImage(own, info.format, { ...layer, offset: 0 })).toEqual(
-                decodeImage(bytes, info.format, layer),
-            )
+            const alone = decodeImage(own, info.format, { ...layer, offset: 0 })
+            expect(Buffer.compare(alone, decodeImage(bytes, info.format, layer))).toBe(0)
         }
     })
 }
@@ -62,9 +61,8 @@ test('bytes that do not start on a four-byte boundary decode the same', () => {
         const moved = new Uint8Array(bytes.length + shift).subarray(shift)
         moved.set(bytes)
         const info = parseDDSHeader(moved)!
-        expect(decodeImage(moved, info.format, info.layers[1])).toEqual(
-            decodeImage(bytes, info.format, info.layers[1]),
-        )
+        const shifted = decodeImage(moved, info.format, info.layers[1])
+        expect(Buffer.compare(shifted, decodeImage(bytes, info.format, info.layers[1]))).toBe(0)
     }
 })
 

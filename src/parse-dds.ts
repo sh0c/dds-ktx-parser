@@ -141,6 +141,12 @@ function fromDXGI(code: number): Format | undefined {
             return ['RG32F', false]
         case DXGI_FORMAT.R32G32B32A32_FLOAT:
             return ['RGBA32F', false]
+        case DXGI_FORMAT.R32G32B32_FLOAT:
+            return ['RGB32F', false]
+        case DXGI_FORMAT.R11G11B10_FLOAT:
+            return ['RG11B10F', false]
+        case DXGI_FORMAT.R9G9B9E5_SHAREDEXP:
+            return ['RGB9E5', false]
     }
     return undefined
 }
@@ -338,5 +344,6 @@ export function parseDDSHeader(
         faces,
         arraySize,
         depth,
+        supercompression: 'none',
     }
 }

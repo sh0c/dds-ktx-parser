@@ -44,10 +44,14 @@ export type UncompressedFormat =
     | 'B4G4R4A4'
     | 'R16F'
     | 'RG16F'
+    | 'RGB16F'
     | 'RGBA16F'
     | 'R32F'
     | 'RG32F'
+    | 'RGB32F'
     | 'RGBA32F'
+    | 'RG11B10F' // packed floats: red 11 bits, green 11, blue 10, no sign
+    | 'RGB9E5' // three 9-bit mantissas sharing one 5-bit exponent
 
 export type ImageFormat = CompressedFormat | UncompressedFormat
 
@@ -74,10 +78,19 @@ export interface LayerInfo {
     readonly depth: number
     // bytes from the start of one row of pixels, or of blocks, to the next
     readonly rowPitch: number
+    // Only in a supercompressed KTX 2: the stored level this image is in,
+    // to read and decompress, and `offset` is then counted within the
+    // decompressed level. readLayer does both.
+    readonly source?: {
+        readonly offset: number
+        readonly length: number
+        readonly scheme: 'zstd' | 'zlib'
+        readonly uncompressedLength: number
+    }
 }
 
 export interface ImageInfo {
-    readonly container: 'dds' | 'ktx'
+    readonly container: 'dds' | 'ktx' | 'ktx2'
     readonly shape: ImageShape
     // every image in the file, in the order the file holds them
     readonly layers: Array<LayerInfo>
@@ -91,6 +104,8 @@ export interface ImageInfo {
     readonly faces: number
     readonly arraySize: number
     readonly depth: number
+    // how the levels are stored: only KTX 2 supercompresses
+    readonly supercompression: 'none' | 'zstd' | 'zlib'
 }
 
 export interface FormatSize {
@@ -136,10 +151,14 @@ export const formatSizes: Record<string, FormatSize> = {
     B4G4R4A4: { blockWidth: 1, blockHeight: 1, blockSize: 2 },
     R16F: { blockWidth: 1, blockHeight: 1, blockSize: 2 },
     RG16F: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
+    RGB16F: { blockWidth: 1, blockHeight: 1, blockSize: 6 },
     RGBA16F: { blockWidth: 1, blockHeight: 1, blockSize: 8 },
     R32F: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     RG32F: { blockWidth: 1, blockHeight: 1, blockSize: 8 },
+    RGB32F: { blockWidth: 1, blockHeight: 1, blockSize: 12 },
     RGBA32F: { blockWidth: 1, blockHeight: 1, blockSize: 16 },
+    RG11B10F: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
+    RGB9E5: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     RGB: { blockWidth: 1, blockHeight: 1, blockSize: 3 },
     RGBA: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
 }
@@ -182,10 +201,14 @@ const channelsOfFormat: Record<ImageFormat, Channels> = {
     B4G4R4A4: 'RGBA',
     R16F: 'R',
     RG16F: 'RG',
+    RGB16F: 'RGB',
     RGBA16F: 'RGBA',
     R32F: 'R',
     RG32F: 'RG',
+    RGB32F: 'RGB',
     RGBA32F: 'RGBA',
+    RG11B10F: 'RGB',
+    RGB9E5: 'RGB',
 }
 
 export function channelsOf(format: ImageFormat): Channels {

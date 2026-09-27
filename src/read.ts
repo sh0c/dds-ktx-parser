@@ -1,20 +1,25 @@
-import { ImageInfo, ParseOptions } from './header-info'
+import { ImageInfo, LayerInfo, ParseOptions } from './header-info'
 import { DDS_HEADER_BYTES, parseDDSHeader } from './parse-dds'
 import { detectContainer, walkKTX } from './parse-ktx'
+import { ktx2IndexBytes, parseKTX2Header } from './parse-ktx2'
+import { decompress } from './decompress'
 import { u32 } from './bytes'
 
 // Reads @length bytes of a file from @offset: a fetch with a Range header,
 // a file handle's read, a slice of a buffer.
 export type ReadRange = (offset: number, length: number) => Promise<Uint8Array>
 
-// Parse a DDS or KTX 1 file by reading only what its header needs, not the
-// file: one read for a DDS; for a KTX, one for the header and four bytes for
-// each mip level. Then decodeImage can be given just the level wanted —
-// read it with `read(layer.offset, layer.length)` and pass
-// `{ ...layer, offset: 0 }`.
+// A ReadRange over a file already in memory.
+export function inMemory(bytes: Uint8Array): ReadRange {
+    return async (offset, length) => bytes.subarray(offset, offset + length)
+}
+
+// Parse a DDS, KTX 1 or KTX 2 file by reading only what its header needs,
+// not the file: one read for a DDS; for a KTX 1, the header and four bytes
+// a level; for a KTX 2, the header and its level index, in one read or two.
 //
-// Answers undefined for what it cannot read, including a KTX 2 file —
-// detectContainer tells that apart from a file that is not a texture.
+// Answers undefined for what it cannot read — detectContainer and
+// describeKTX2 say what it is.
 export async function readImageInfo(
     read: ReadRange,
     fileSize: number,
@@ -37,6 +42,28 @@ export async function readImageInfo(
             }
             return step.value
         }
+        case 'ktx2': {
+            if (head.length < 80) return undefined
+            const index = Math.min(ktx2IndexBytes(head), fileSize)
+            const bytes = index <= head.length ? head : await read(0, index)
+            return bytes.length < index ? undefined : parseKTX2Header(bytes, fileSize, options)
+        }
     }
     return undefined
+}
+
+// Read one image of the file, and nothing else — decompressing its level
+// first if it is supercompressed — ready for
+// `decodeImage(bytes, info.format, { ...layer, offset: 0 })`.
+export async function readLayer(read: ReadRange, layer: LayerInfo): Promise<Uint8Array> {
+    if (!layer.source) {
+        const bytes = await read(layer.offset, layer.length)
+        if (bytes.length !== layer.length) throw new RangeError('the file ended before the image did')
+        return bytes
+    }
+    const { source } = layer
+    const stored = await read(source.offset, source.length)
+    if (stored.length !== source.length) throw new RangeError('the file ended before the level did')
+    const level = decompress(source.scheme, stored, source.uncompressedLength)
+    return level.subarray(layer.offset, layer.offset + layer.length)
 }

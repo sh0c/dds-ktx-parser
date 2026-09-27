@@ -1,7 +1,7 @@
 {
   "name": "dds-ktx-parser",
   "version": "2.0.0",
-  "description": "Parse DDS and KTX textures, reading only the bytes needed, and decode BC1-BC7 and uncompressed formats to RGBA. No dependencies; runs in Node, browsers and workers.",
+  "description": "Parse DDS, KTX and KTX 2 textures, reading only the bytes needed, and decode BC1-BC7, uncompressed and HDR formats to RGBA. No dependencies; runs in Node, browsers and workers.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -14,7 +14,8 @@
   },
   "sideEffects": false,
   "files": [
-    "dist"
+    "dist",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "scripts": {
     "build": "tsup",
@@ -23,6 +24,7 @@
   "keywords": [
     "dds",
     "ktx",
+    "ktx2",
     "parser",
     "decoder",
     "bc1",

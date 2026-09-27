@@ -6,6 +6,16 @@ import { halfToFloat, u16, u32 } from '../bytes'
 const snorm8 = (v: number): number => Math.max(-1, (v > 127 ? v - 256 : v) / 127)
 const snorm16 = (v: number): number => Math.max(-1, (v > 32767 ? v - 65536 : v) / 32767)
 
+// An unsigned small float: a 5-bit exponent biased by 15 and a mantissa of
+// @bits bits, as the channels of RG11B10F are.
+function smallFloat(v: number, bits: number): number {
+    const e = v >> bits
+    const m = v & ((1 << bits) - 1)
+    if (e === 0) return (m / (1 << bits)) * Math.pow(2, -14)
+    if (e === 31) return m === 0 ? Infinity : NaN
+    return Math.pow(2, e - 15) * (1 + m / (1 << bits))
+}
+
 // One row of pixels of an uncompressed format, as RGBA floats in @into from
 // @at. Channels a format has not got are 0, and alpha is 1 — the way a GPU
 // samples them — except L8, which is grey.
@@ -131,6 +141,35 @@ export function decodeRowFloat(
                 r = halfToFloat(u16(bytes, start + x * 4))
                 g = halfToFloat(u16(bytes, start + x * 4 + 2))
                 break
+            case 'RGB16F': {
+                const p = start + x * 6
+                r = halfToFloat(u16(bytes, p))
+                g = halfToFloat(u16(bytes, p + 2))
+                b = halfToFloat(u16(bytes, p + 4))
+                break
+            }
+            case 'RGB32F': {
+                const p = start + x * 12
+                r = view.getFloat32(p, true)
+                g = view.getFloat32(p + 4, true)
+                b = view.getFloat32(p + 8, true)
+                break
+            }
+            case 'RG11B10F': {
+                const v = u32(bytes, start + x * 4)
+                r = smallFloat(v & 0x7ff, 6)
+                g = smallFloat((v >>> 11) & 0x7ff, 6)
+                b = smallFloat((v >>> 22) & 0x3ff, 5)
+                break
+            }
+            case 'RGB9E5': {
+                const v = u32(bytes, start + x * 4)
+                const scale = Math.pow(2, (v >>> 27) - 15 - 9)
+                r = (v & 0x1ff) * scale
+                g = ((v >>> 9) & 0x1ff) * scale
+                b = ((v >>> 18) & 0x1ff) * scale
+                break
+            }
             case 'RGBA16F': {
                 const p = start + x * 8
                 r = halfToFloat(u16(bytes, p))

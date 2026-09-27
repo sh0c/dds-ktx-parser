@@ -145,3 +145,48 @@ export const f32s = (...values: number[]): Uint8Array => {
     values.forEach((v, i) => new DataView(out.buffer).setFloat32(i * 4, v, true))
     return out
 }
+
+export interface KTX2Options {
+    vkFormat: number
+    width: number
+    height: number
+    depth?: number
+    layers?: number
+    faces?: number
+    // each level's bytes, uncompressed, level 0 first
+    levels: Uint8Array[]
+    // 0 none, 1 BasisLZ, 2 Zstandard, 3 zlib
+    scheme?: number
+    compress?: (level: Uint8Array) => Uint8Array
+    // what the level index says, when a test wants it to lie
+    lie?: { level: number; byteLength?: number; uncompressed?: number; byteOffset?: number }
+}
+
+// A KTX 2 file: header, index, level index, and the levels stored smallest
+// first, as the specification recommends — so the index, not the order, is
+// what finds them.
+export function ktx2(o: KTX2Options): Uint8Array {
+    const stored = o.levels.map((level) => (o.compress ? o.compress(level) : level))
+    const indexEnd = 80 + 24 * o.levels.length
+    const offsets: number[] = new Array(o.levels.length)
+    let at = Math.ceil(indexEnd / 16) * 16
+    for (let i = o.levels.length - 1; i >= 0; i--) {
+        offsets[i] = at
+        at += Math.ceil(stored[i].length / 16) * 16
+    }
+    const out = new Uint8Array(at)
+    out.set(KTX2, 0)
+    const v = new DataView(out.buffer)
+    ;[o.vkFormat, 1, o.width, o.height, o.depth ?? 0, o.layers ?? 0, o.faces ?? 1, o.levels.length, o.scheme ?? 0].forEach(
+        (value, i) => v.setUint32(12 + i * 4, value, true),
+    )
+    stored.forEach((bytes, i) => {
+        const entry = 80 + i * 24
+        const lie = o.lie?.level === i ? o.lie : undefined
+        v.setUint32(entry, lie?.byteOffset ?? offsets[i], true)
+        v.setUint32(entry + 8, lie?.byteLength ?? bytes.length, true)
+        v.setUint32(entry + 16, lie?.uncompressed ?? o.levels[i].length, true)
+        out.set(bytes, offsets[i])
+    })
+    return out
+}
