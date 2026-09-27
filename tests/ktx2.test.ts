@@ -188,10 +188,11 @@ describe('what is not read, and why', () => {
         expect(describeKTX2(basis)).toMatchObject({ vkFormat: 0, supercompression: 'basislz', width: 64 })
     })
 
-    test('a format with no decoder here — ETC2 — is described, not parsed', () => {
-        const etc2 = ktx2({ vkFormat: 147, width: 4, height: 4, levels: [new Uint8Array(8)] })
-        expect(parseKTX2Header(etc2)).toBeUndefined()
-        expect(describeKTX2(etc2)?.vkFormat).toBe(147)
+    test('a format with no decoder here — PVRTC — is described, not parsed', () => {
+        // VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG
+        const pvrtc = ktx2({ vkFormat: 1000054000, width: 4, height: 4, levels: [new Uint8Array(8)] })
+        expect(parseKTX2Header(pvrtc)).toBeUndefined()
+        expect(describeKTX2(pvrtc)?.vkFormat).toBe(1000054000)
     })
 })
 
