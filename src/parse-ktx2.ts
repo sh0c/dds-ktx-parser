@@ -1,4 +1,4 @@
-import { ASTC_SIZES, ImageFormat, ImageInfo, LayerInfo, ParseOptions, channelsOf, levelLength, plausible } from './header-info'
+import { ASTC_SIZES, Channels, ImageFormat, ImageInfo, LayerInfo, ParseOptions, channelsOf, levelLength, plausible } from './header-info'
 import { u32 } from './bytes'
 import type { Supercompression } from './decompress'
 
@@ -175,9 +175,39 @@ function u64(bytes: Uint8Array, at: number): number {
 }
 
 // How many bytes from the start of the file parseKTX2Header needs: the
-// header and the level index. @head is at least the 80-byte header.
+// header, the level index, and the data format descriptor after it, which
+// says what a Basis Universal file's channels are. @head is at least the
+// 80-byte header.
 export function ktx2IndexBytes(head: Uint8Array): number {
-    return KTX2_HEADER_BYTES + Math.max(1, u32(head, at.levelCount)) * LEVEL_ENTRY_BYTES
+    const index = KTX2_HEADER_BYTES + Math.max(1, u32(head, at.levelCount)) * LEVEL_ENTRY_BYTES
+    const dfdEnd = u32(head, at.dfdByteOffset) + u32(head, at.dfdByteOffset + 4)
+    // A descriptor that is not just after the index, or is huge, is not read.
+    return dfdEnd > index && dfdEnd <= index + 4096 ? dfdEnd : index
+}
+
+// The data format descriptor's basic block, when @bytes holds it: its
+// colour model, transfer function and the channel of each sample.
+// Khronos Data Format Specification, section 5.
+export function readDFD(bytes: Uint8Array): { colorModel: number; transfer: number; channels: number[] } | undefined {
+    const dfd = u32(bytes, at.dfdByteOffset)
+    const length = u32(bytes, at.dfdByteOffset + 4)
+    if (dfd === 0 || length < 28 || dfd + length > bytes.length) return undefined
+    const block = dfd + 4
+    const blockSize = bytes[block + 6] | (bytes[block + 7] << 8)
+    const samples = Math.max(0, Math.floor((blockSize - 24) / 16))
+    const channels: number[] = []
+    for (let s = 0; s < samples && block + 24 + s * 16 + 4 <= bytes.length; s++) channels.push(bytes[block + 24 + s * 16 + 3] & 15)
+    return { colorModel: bytes[block + 8], transfer: bytes[block + 10], channels }
+}
+
+// KHR_DF_MODEL_UASTC and its channel ids.
+const MODEL_UASTC = 166
+const UASTC_CHANNELS: Record<number, [ImageFormat, Channels]> = {
+    0: ['UASTC_RGB', 'RGB'],
+    3: ['UASTC_RGBA', 'RGBA'],
+    4: ['UASTC_RGB', 'L'], // RRR
+    5: ['UASTC_RGBA', 'LA'], // RRRG
+    6: ['UASTC_RGB', 'RG'],
 }
 
 // What a KTX 2 file is, for saying why one is not shown: its VkFormat, its
@@ -218,8 +248,18 @@ export function parseKTX2Header(
     if (bytes.length < KTX2_HEADER_BYTES) return undefined
     const described = describeKTX2(bytes)
     if (!described) return undefined
-    const format = fromVk(described.vkFormat)
     const compression = scheme(u32(bytes, at.supercompressionScheme))
+    let format = fromVk(described.vkFormat)
+    let channels: Channels | undefined
+    // No VkFormat: Basis Universal, which the descriptor names.
+    if (described.vkFormat === 0) {
+        const dfd = readDFD(bytes)
+        if (dfd?.colorModel === MODEL_UASTC && dfd.channels.length === 1 && UASTC_CHANNELS[dfd.channels[0]]) {
+            const [uastc, which] = UASTC_CHANNELS[dfd.channels[0]]
+            format = [uastc, dfd.transfer === 2]
+            channels = which
+        }
+    }
     if (!format || !compression || compression === 'basislz') return undefined
     const [imageFormat, srgb] = format
 
@@ -278,7 +318,7 @@ export function parseKTX2Header(
         layers,
         format: imageFormat,
         srgb,
-        channels: channelsOf(imageFormat),
+        channels: channels ?? channelsOf(imageFormat),
         levels,
         faces,
         arraySize,

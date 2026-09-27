@@ -10,6 +10,16 @@ import {
     levelLength,
 } from '../header-info'
 import { decodeASTCBytes, decodeASTCFloat } from './astc'
+import { decodeUASTCBlock } from './uastc'
+
+// UASTC decoded as Basis's own transcoder decodes it to RGBA: without
+// sRGB's widening whatever the file's transfer function — which moves some
+// values by one — and, for a file without alpha, with alpha 255.
+const opaqueUASTC = (block: Uint8Array): Uint8Array => {
+    const out = decodeUASTCBlock(block, false)
+    for (let i = 3; i < 64; i += 4) out[i] = 255
+    return out
+}
 import { unorm8 } from '../bytes'
 
 import { decodeBC1Block } from './bc1'
@@ -53,6 +63,8 @@ const bytesBlocks: Partial<Record<ImageFormat, BytesBlock>> = {
     ETC2_RGB: decodeETC2Block,
     ETC2_RGB_A1: decodeETC2A1Block,
     ETC2_RGBA: decodeETC2RGBABlock,
+    UASTC_RGBA: (block) => decodeUASTCBlock(block, false),
+    UASTC_RGB: opaqueUASTC,
 }
 const floatBlocks: Partial<Record<ImageFormat, FloatBlock>> = {
     BC4_SNORM: decodeBC4SnormBlock,

@@ -29,6 +29,10 @@ export type CompressedFormat =
     | 'EAC_RG11'
     | 'EAC_RG11_SNORM'
     | AstcFormat
+    // Basis Universal's UASTC, 4×4. With alpha, or without: a file that
+    // says it has none is opaque whatever its blocks hold.
+    | 'UASTC_RGBA'
+    | 'UASTC_RGB'
 
 // ASTC, in each of its fourteen 2D block sizes, three ways: LDR, sRGB and
 // HDR decode the same bits differently, so each is a format of its own.
@@ -167,6 +171,8 @@ export const formatSizes: Record<string, FormatSize> = {
     EAC_R11_SNORM: { blockWidth: 4, blockHeight: 4, blockSize: 8 },
     EAC_RG11: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
     EAC_RG11_SNORM: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
+    UASTC_RGBA: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
+    UASTC_RGB: { blockWidth: 4, blockHeight: 4, blockSize: 16 },
     RGBA8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     RGBX8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
     BGRA8: { blockWidth: 1, blockHeight: 1, blockSize: 4 },
@@ -209,7 +215,7 @@ for (const size of ASTC_SIZES) {
 
 // The channels a format carries. L is luminance (one value shown in all
 // three), A is alpha alone.
-export type Channels = 'R' | 'RG' | 'RGB' | 'RGBA' | 'L' | 'A'
+export type Channels = 'R' | 'RG' | 'RGB' | 'RGBA' | 'L' | 'LA' | 'A'
 
 const channelsOfFormat: Record<Exclude<ImageFormat, AstcFormat>, Channels> = {
     BC1: 'RGBA', // its one-bit alpha mode
@@ -230,6 +236,8 @@ const channelsOfFormat: Record<Exclude<ImageFormat, AstcFormat>, Channels> = {
     EAC_R11_SNORM: 'R',
     EAC_RG11: 'RG',
     EAC_RG11_SNORM: 'RG',
+    UASTC_RGBA: 'RGBA',
+    UASTC_RGB: 'RGB',
     RGBA8: 'RGBA',
     RGBX8: 'RGB',
     BGRA8: 'RGBA',

@@ -1097,3 +1097,8 @@ export function decodeASTCFloat(block: Uint8Array, width: number, height: number
     for (let i = 0; i < out.length; i++) out[i] = toFloat(d, i, profile)
     return out
 }
+
+// The partition of each texel of a 4×4 block, for UASTC, which uses ASTC's.
+export function partitionOf4x4(count: number, seedIndex: number): Uint8Array {
+    return partitionOf(sizeOf(4, 4), count, seedIndex)
+}

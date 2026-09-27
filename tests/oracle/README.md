@@ -58,3 +58,28 @@ Two things the comparison settled that the specification leaves open:
   to need, so HDR is compared through DDS, which it always writes as RGBA.
 - astcenc decodes a negative channel of an HDR void-extent block as NaN;
   this package does too.
+
+## UASTC: KTX-Software
+
+[KTX-Software](https://github.com/KhronosGroup/KTX-Software)'s `ktx` tool
+(Apache 2.0), from a release — check it against the release's `.sha1`. It
+encodes with Basis Universal and transcodes with Basis Universal's own
+decoder, so it is the reference for what a Basis file decodes to. `KTX` is
+the command, which may run it in WSL from Windows:
+
+```console
+$ KTX=path/to/ktx npx ts-node tests/oracle/compare-uastc.ts
+$ KTX="wsl -d Ubuntu-22.04 -- /path/to/ktx" npx ts-node tests/oracle/compare-uastc.ts
+$ KTX=path/to/ktx npx ts-node tests/oracle/record-uastc.ts
+```
+
+`compare-uastc.ts` encodes generated images — colour and alpha, opaque, grey
+and alpha, smooth — linear and sRGB, at quality 0, 2 and 4 and with RDO,
+then replaces the blocks with random ones of every mode; `ktx transcode
+--target rgba8` decodes each; every texel is compared. Last run: identical on
+all of them.
+
+What the comparison settled: Basis's transcoder decodes UASTC without sRGB's
+widening whatever the transfer function — so does this package, which moves
+some sRGB values by one from what an ASTC decoder would give — and a file
+whose data format descriptor has no alpha is decoded with alpha 255.
